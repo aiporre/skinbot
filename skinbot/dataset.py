@@ -12,8 +12,8 @@ class WoundImages(Dataset):
     def __len__(self):
         return len(self.image_fnames)
     
-    def __getitem(self, index):
-        image_path = os.path.join(self.image_dir, self.image_fnames[index])
+    def __getitem__(self, index):
+        image_path = os.path.join(self.images_dir, self.image_fnames[index])
         image = read_image(image_path)
         label = self.image_fnames[index].split("_")[0]
         if self.transform:
