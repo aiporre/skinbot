@@ -1,8 +1,9 @@
 import os
 import random
 import csv
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
+from skinbot.transformers import TargetOneHot, TargetValue, Pretrained
 
 class WoundImages(Dataset):
     def __init__(self, root_dir, fold_iteration=None, cross_validation_folds=10, test=False, transform=None, target_transform=None):
@@ -75,3 +76,34 @@ class KFold:
         else:
             return [self.image_fnames[i] for i in train_indices]
 
+def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='onehot'):
+    assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
+    assert target in ['onehot', 'number', 'string'], "valid options to target mode are 'onehot', 'number' or 'string'"
+
+    root_dir = config['DATASET']['root']
+    if target == 'onehot':
+        target_transform = TargetOneHot()
+    elif target == "number":
+        target_transform = TargetValue()
+    elif target == 'string':
+        target_transform =None 
+    
+    # todo: from confing input_size must be generated of input from the get_model 
+    if mode == "all":
+        wound_images = WoundImages(root_dir, target_transform=target_transform)
+    elif mode == 'test':
+        transform = Pretrained(test=True)
+        wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, transform=transform, target_transform=target_transform)
+        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
+    elif mode == 'train':
+        transform = Pretrained(test=False)
+        wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, transform=transform, target_transform=target_transform)
+        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
+    return dataloader
+
+
+
+
+
+
+    
