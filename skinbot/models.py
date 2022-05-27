@@ -14,24 +14,33 @@ def pretrained_model(model_name, num_outputs, frezze=False, pretrained=True):
         backbone = models.resnet101(pretrained=pretrained)
         if frezze:
             frezze_model(backbone)
-            num_features = backbone.fc.in_features
-            backbone.fc = nn.Linear(num_features, num_outputs)
+        num_features = backbone.fc.in_features
+        backbone.fc = nn.Linear(num_features, num_outputs)
     else:
         raise Exception(f'model name {model_name} is not defined')
     return backbone
 
-def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8):
+def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, frezze=False):
     if model_name.startswith('resnet'):
-        model = pretrained_model(model_name, num_outputs=num_classes)
+        model = pretrained_model(model_name, num_outputs=num_classes, frezze=frezze)
     else:
         raise ValueException(f"Model name {model_name} is not defined.")
     if optimizer is not None:
+        if frezze:
+            model_parameters = []
+            for n, p in model.named_parameters():
+                if p.requires_grad:
+                    model_parameters.append(p)
+        else:
+            model_parameters = model.parameters()
+
         if optimizer == 'SGD':
-            model_optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+            model_optimizer = torch.optim.SGD(model_parameters, lr=lr, momentum=momentum)
         else:
             raise Exception(f"optimizer name {optimizer} not defined")
         return model, model_optimizer
     else:
         return model
+
 
 
