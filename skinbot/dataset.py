@@ -52,7 +52,7 @@ class KFold:
             fold_indices_flat.extend(x)
         random.shuffle(fold_indices_flat)
         with open(self.splits_file, "w", newline='') as f:
-            file_writer = csv.writer(f,  delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            file_writer = csv.writer(f,  delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             file_writer.writerow(['fname', 'fold'])
             for (fname, index) in zip(self.image_fnames, fold_indices_flat):
                 file_writer.writerow([fname, index])
@@ -60,23 +60,26 @@ class KFold:
     def read_splits(self):
         fold_indices = []
         with open(self.splits_file, mode='r', newline='') as f:
-            file_reader = csv.DictReader(f, delimiter=' ')
+            file_reader = csv.DictReader(f, delimiter=',')
             for row in file_reader:
-                print(row)
-                fold_indices.append(row['fold'])
+                print('DEBUG row[fold] = ', row['fold'])
+                fold_indices.append(int(row['fold']))
         return fold_indices
 
     def get_split(self, fold_iteration, test=False):
         assert fold_iteration>=0 and fold_iteration<=self.k-1, f"fold iteration must be between 0 and {self.k-1}"
         test_target_value = self.k - fold_iteration - 1
+        print('DEBUG: test_target_value ', test_target_value)
         test_indices = list(filter(lambda x: self.fold_indices[x] == test_target_value, range(len(self.fold_indices))))
         train_indices = list(filter(lambda x: self.fold_indices[x] != test_target_value, range(len(self.fold_indices))))
+        print('DEBuG lend of test indices: ', len(test_indices))
+        print('DEBuG lend of train indices: ', len(train_indices))
         if test:
             return [self.image_fnames[i] for i in test_indices]
         else:
             return [self.image_fnames[i] for i in train_indices]
 
-def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='onehot'):
+def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='number'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
     assert target in ['onehot', 'number', 'string'], "valid options to target mode are 'onehot', 'number' or 'string'"
 
@@ -94,10 +97,13 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='onehot'
     elif mode == 'test':
         transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, transform=transform, target_transform=target_transform)
+
+        print('DEBUG: lenght of the dataset test: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
     elif mode == 'train':
         transform = Pretrained(test=False)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, transform=transform, target_transform=target_transform)
+        print('DEBUG: lenght of the dataset train: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
     return dataloader
 
