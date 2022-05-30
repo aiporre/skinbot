@@ -8,7 +8,7 @@ from skinbot.transformers import TargetOneHot, TargetValue, Pretrained
 class WoundImages(Dataset):
     def __init__(self, root_dir, fold_iteration=None, cross_validation_folds=10, test=False, transform=None, target_transform=None):
         if fold_iteration is None:
-            self.image_fnames= os.listdir(os.path.join(root_dir, "images"))
+            self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images")) if not '_mask.' in f]
         else:
             self.kfold = KFold(root_dir, k=cross_validation_folds)
             self.image_fnames = self.kfold.get_split(fold_iteration, test=test)
@@ -33,7 +33,7 @@ class KFold:
     def __init__(self, root_dir, k=10):
         self.k = k
         self.splits_file = os.path.join(root_dir, f"splits_{k}.txt")
-        self.image_fnames= os.listdir(os.path.join(root_dir, "images"))
+        self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images")) if not '_mask.' in f]
         self.images_dir = os.path.join(root_dir, "images")
         if not os.path.exists(self.splits_file):
             self.create_splits_file()
