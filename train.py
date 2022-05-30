@@ -1,3 +1,4 @@
+import os
 import torch
 from skinbot.dataset import get_dataloaders 
 from skinbot.config import read_config
@@ -7,7 +8,23 @@ from skinbot.transformers import num_classes
 from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
 from ignite.metrics import Accuracy, Loss, RunningAverage
 from ignite.contrib.handlers import ProgressBar
-from ignite.handlers import Checkpoint, global_step_from_engine
+from ignite.handlers import Checkpoint, global_step_from_engine, DiskSaver
+
+
+
+def get_last_checkpoint(path_models):
+    iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt')]
+    iterations = [int(ii) for ii in iterations if ii.isnumeric()]
+    last_iteration = max(iterations)
+    return f"checkpoint_{last_iteration}.pt"
+
+def get_best_iteration(path_models):
+    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt')]
+    iterations = [float(ii) for ii in iterations]
+    last_iteration = max(iterations)
+    last_iteration_end = f"={last_iteration:.4f}.pt"
+    best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end)]
+    return best_model_path[0]
 
 def main():
     log_interval = 1
@@ -75,20 +92,28 @@ def main():
         pbar.n = pbar.last_print_n = 0
     
     to_save = {"weights": model, "optimizer": optimizer}
-    handler = Checkpoint(
-        to_save, './models', n_saved=2
+    handler_ckpt = Checkpoint(
+        to_save, save_handler=DiskSaver('./models', create_dir=True, require_empty=False), n_saved=2
     )
-    trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler)
+    last_checkpoint_path = get_last_checkpoint('./models')
+    last_checkpoint_path = os.path.join('./models', last_checkpoint_path)
+    to_load = to_save
+    handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+
+    trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
 
     to_save = {'model': model}
-    handler = Checkpoint(
-        to_save, './models',
+    handler_best = Checkpoint(
+        to_save, 
+        save_handler=DiskSaver('./best_models', create_dir=True, require_empty=False),
         n_saved=2, filename_prefix='best',
         score_name="accuracy",
         global_step_transform=global_step_from_engine(trainer)
     )
 
-    evaluator.add_event_handler(Events.COMPLETED, handler)
+    best_model_path = get_best_iteration('./best_models')
+    evaluator.add_event_handler(Events.COMPLETED, handler_best)
+
 
     trainer.run(train_dataloader, max_epochs=5)
 
