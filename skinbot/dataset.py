@@ -62,18 +62,18 @@ class KFold:
         with open(self.splits_file, mode='r', newline='') as f:
             file_reader = csv.DictReader(f, delimiter=',')
             for row in file_reader:
-                print('DEBUG row[fold] = ', row['fold'])
+                # print('DEBUG row[fold] = ', row['fold'])
                 fold_indices.append(int(row['fold']))
         return fold_indices
 
     def get_split(self, fold_iteration, test=False):
         assert fold_iteration>=0 and fold_iteration<=self.k-1, f"fold iteration must be between 0 and {self.k-1}"
         test_target_value = self.k - fold_iteration - 1
-        print('DEBUG: test_target_value ', test_target_value)
+        # print('DEBUG: test_target_value ', test_target_value)
         test_indices = list(filter(lambda x: self.fold_indices[x] == test_target_value, range(len(self.fold_indices))))
         train_indices = list(filter(lambda x: self.fold_indices[x] != test_target_value, range(len(self.fold_indices))))
-        print('DEBuG lend of test indices: ', len(test_indices))
-        print('DEBuG lend of train indices: ', len(train_indices))
+        # print('DEBuG lend of test indices: ', len(test_indices))
+        # print('DEBuG lend of train indices: ', len(train_indices))
         if test:
             return [self.image_fnames[i] for i in test_indices]
         else:
@@ -98,12 +98,12 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='number'
         transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, transform=transform, target_transform=target_transform)
 
-        print('DEBUG: lenght of the dataset test: ', len(wound_images) )
+        # print('DEBUG: lenght of the dataset test: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
     elif mode == 'train':
         transform = Pretrained(test=False)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, transform=transform, target_transform=target_transform)
-        print('DEBUG: lenght of the dataset train: ', len(wound_images) )
+        # print('DEBUG: lenght of the dataset train: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
     return dataloader
 
