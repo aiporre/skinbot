@@ -38,6 +38,8 @@ def main():
     log_interval = 1
     config = read_config()
     root_dir = config["DATASET"]["root"]
+    best_or_last = 'best'
+    only_eval = True
     # prepare dataset
     test_dataloader = get_dataloaders(config, batch=16, mode='test')
     train_dataloader = get_dataloaders(config, batch=16, mode='train')
@@ -109,9 +111,10 @@ def main():
     
     to_save = {"weights": model, "optimizer": optimizer}
     handler_ckpt = Checkpoint(
-        to_save, save_handler=DiskSaver('./models', create_dir=True, require_empty=False), n_saved=2
+        to_save,
+        save_handler=DiskSaver('./models', create_dir=True, require_empty=False),
+        n_saved=2
     )
-    best_or_last = 'best'
     if best_or_last == 'last':
         last_checkpoint_path = get_last_checkpoint('./models')
         last_checkpoint_path = os.path.join('./models', last_checkpoint_path)
@@ -124,7 +127,8 @@ def main():
     handler_best = Checkpoint(
         to_save, 
         save_handler=DiskSaver('./best_models', create_dir=True, require_empty=False),
-        n_saved=2, filename_prefix='best',
+        n_saved=2,
+        filename_prefix='best',
         score_name="accuracy",
         global_step_transform=global_step_from_engine(trainer)
     )
@@ -136,7 +140,6 @@ def main():
         handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
 
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
-    only_eval = True
     if not only_eval:
         trainer.run(train_dataloader, max_epochs=10)
     else:
