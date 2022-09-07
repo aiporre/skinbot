@@ -169,6 +169,8 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='number'
     elif target == 'fuzzy':
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
+    else:
+        raise ValueError(f"Invalid target {target}")
 
     
     # todo: from confing input_size must be generated of input from the get_model 
