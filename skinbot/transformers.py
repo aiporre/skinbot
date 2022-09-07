@@ -30,6 +30,11 @@ class TargetValue:
         x = x.strip().lower()
         return target_str_to_num[x]
 
+class FuzzyTargetValue:
+    def __call__(self, x):
+        values = np.array( [x[k] for k in target_str_to_num.keys()])
+        return values
+
 class ToFloat:
     def __call__(self, x):
         if isinstance(x, torch.Tensor):
