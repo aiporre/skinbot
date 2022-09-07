@@ -95,10 +95,12 @@ def main():
     handler_ckpt = Checkpoint(
         to_save, save_handler=DiskSaver('./models', create_dir=True, require_empty=False), n_saved=2
     )
-    last_checkpoint_path = get_last_checkpoint('./models')
-    last_checkpoint_path = os.path.join('./models', last_checkpoint_path)
-    to_load = to_save
-    handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+    best_or_last = 'best'
+    if best_or_last == 'last':
+        last_checkpoint_path = get_last_checkpoint('./models')
+        last_checkpoint_path = os.path.join('./models', last_checkpoint_path)
+        to_load = to_save
+        handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
 
     trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
 
@@ -111,7 +113,12 @@ def main():
         global_step_transform=global_step_from_engine(trainer)
     )
 
-    best_model_path = get_best_iteration('./best_models')
+    if best_or_last == 'best':
+        best_model_path = get_best_iteration('./best_models')
+        best_model_path = os.path.join('./best_models', best_model_path)
+        to_load = to_save
+        handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
 
 
