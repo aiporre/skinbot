@@ -33,6 +33,7 @@ class TargetValue:
 class FuzzyTargetValue:
     def __call__(self, x):
         values = np.array( [x[k] for k in target_str_to_num.keys()])
+        values = values / np.max(values)
         return values
 
 class ToFloat:
@@ -42,7 +43,7 @@ class ToFloat:
         elif isinstance(x, np.ndarray):
             return x.astype(np.float32)
         else:
-            raise ValueException(f'Input x is type {type(x)} not supported. Valids are torch.Tensor and numpy.ndarray')
+            raise ValueError(f'Input x is type {type(x)} not supported. Valids are torch.Tensor and numpy.ndarray')
 
 class Pretrained:
     def __init__(self, test=False, input_size=224):

@@ -19,35 +19,58 @@ from ignite.handlers import Checkpoint, global_step_from_engine, DiskSaver
 
 
 
-def get_last_checkpoint(path_models):
-    iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt')]
+def get_last_checkpoint(path_models, fold, model_name, target_mode):
+    prefix = f"last_fold={fold}_{model_name}_{target_mode}_checkpoint"
+    iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
     iterations = [int(ii) for ii in iterations if ii.isnumeric()]
+    if len(iterations) == 0:
+        return None
     last_iteration = max(iterations)
-    return f"checkpoint_{last_iteration}.pt"
+    return f"{prefix}_{last_iteration}.pt"
 
-def get_best_iteration(path_models):
-    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt')]
+def get_best_iteration(path_models, fold, model_name, target_mode):
+    prefix = f"best_fold={fold}_{model_name}_{target_mode}_model"
+    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+    if len(iterations) == 0:
+        return None
     iterations = [float(ii) for ii in iterations]
     last_iteration = max(iterations)
     last_iteration_end = f"={last_iteration:.4f}.pt"
-    best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end)]
-    return best_model_path[0]
+    best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end) and p.startswith(prefix)][0]
+    return best_model_path
+class CosineLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cosine = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+    def forward(self, x, y):
+        return torch.mean(1 - self.cosine(x, y))
 
 def main():
     log_interval = 1
     log_interval = 1
     config = read_config()
     root_dir = config["DATASET"]["root"]
-    best_or_last = 'best'
-    only_eval = True
+    best_or_last = 'last'
+    only_eval = False
+    fold = 0
+    model_name = 'resnet101'
+    fuzzy_labels = True
     # prepare dataset
-    test_dataloader = get_dataloaders(config, batch=16, mode='test')
-    train_dataloader = get_dataloaders(config, batch=16, mode='train')
+    if fuzzy_labels:
+        target_mode = "fuzzy"
+    else:
+        target_mode = "number"
+
+    test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=fold, target=target_mode)
+    train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=fold, target=target_mode)
     
 
     # prepare models
-    model, optimizer = get_model('resnet101', optimizer='SGD')
-    criterion = torch.nn.CrossEntropyLoss() 
+    model, optimizer = get_model(model_name, optimizer='SGD')
+    if fuzzy_labels:
+        criterion = CosineLoss()
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
     trainer = create_supervised_trainer(model, optimizer, criterion)
 
     def pred_in_prob(output):
@@ -55,7 +78,11 @@ def main():
         y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred_prob, dim=1)
         y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
-        y_onehot= torch.nn.functional.one_hot(y, num_classes=num_classes)
+        if fuzzy_labels:
+            y_argmax = torch.argmax(y, dim=1)
+        else:
+            y_argmax = y
+        y_onehot= torch.nn.functional.one_hot(y_argmax, num_classes=num_classes)
         return y_pred_onehot, y_onehot
 
     def pred_in_onehot(output):
@@ -63,8 +90,12 @@ def main():
         y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred_prob, dim=1)
         y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
-        y = y.long()
-        return y_pred_onehot, y
+
+        if fuzzy_labels:
+            y_argmax = torch.argmax(y, dim=1)
+        else:
+            y_argmax = y.long()
+        return y_pred_onehot, y_argmax
 
     val_metrics = {
         "accuracy": Accuracy(output_transform=pred_in_prob, is_multilabel=True),
@@ -113,13 +144,16 @@ def main():
     handler_ckpt = Checkpoint(
         to_save,
         save_handler=DiskSaver('./models', create_dir=True, require_empty=False),
-        n_saved=2
+        n_saved=2,
+        filename_prefix=f'last_fold={fold}_{model_name}_{target_mode}',
     )
     if best_or_last == 'last':
-        last_checkpoint_path = get_last_checkpoint('./models')
-        last_checkpoint_path = os.path.join('./models', last_checkpoint_path)
-        to_load = to_save
-        handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+        last_checkpoint_path = get_last_checkpoint('./models', fold, model_name, target_mode)
+        if last_checkpoint_path is not None:
+            last_checkpoint_path = os.path.join('./models', last_checkpoint_path)
+            to_load = to_save
+            handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+            print('loaded last checkpoint', last_checkpoint_path)
 
     trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
 
@@ -128,16 +162,18 @@ def main():
         to_save, 
         save_handler=DiskSaver('./best_models', create_dir=True, require_empty=False),
         n_saved=2,
-        filename_prefix='best',
+        filename_prefix=f'best_fold={fold}_{model_name}_{target_mode}',
         score_name="accuracy",
         global_step_transform=global_step_from_engine(trainer)
     )
 
     if best_or_last == 'best':
-        best_model_path = get_best_iteration('./best_models')
-        best_model_path = os.path.join('./best_models', best_model_path)
-        to_load = to_save
-        handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+        best_model_path = get_best_iteration('./best_models',fold, model_name, target_mode)
+        if best_model_path is not None:
+            best_model_path = os.path.join('./best_models', best_model_path)
+            to_load = to_save
+            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+            print('loaded best model', best_model_path)
 
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
     if not only_eval:
