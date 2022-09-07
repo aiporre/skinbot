@@ -108,6 +108,20 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='number'
     return dataloader
 
 
+def read_labels_xls(root_dir, concat=True):
+    tables = {}
+    labels_file = os.path.join(root_dir, 'labels', "labels.xlsx")
+    xls = pd.ExcelFile(labels_file)
+    for sheet_name in xls.sheet_names:
+        df = xls.parse(sheet_name)
+        df = df.rename(columns=lambda x: x.strip())
+        tables[sheet_name] = df[LABEL_COLUMN_NAMES]
+    if not concat:
+        return tables
+    # concat all tables
+    df = pd.concat(tables.values(), ignore_index=True)
+    return df
+
 
 
 
