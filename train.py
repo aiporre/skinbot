@@ -43,6 +43,7 @@ class CosineLoss(torch.nn.Module):
         super().__init__()
         self.cosine = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
     def forward(self, x, y):
+        x = torch.softmax(x, dim=1)
         return torch.mean(1 - self.cosine(x, y))
 
 def main():
@@ -55,6 +56,7 @@ def main():
     fold = 0
     model_name = 'resnet101'
     fuzzy_labels = True
+    EPOCHS = 100
     # prepare dataset
     if fuzzy_labels:
         target_mode = "fuzzy"
@@ -177,7 +179,7 @@ def main():
 
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
     if not only_eval:
-        trainer.run(train_dataloader, max_epochs=10)
+        trainer.run(train_dataloader, max_epochs=EPOCHS)
     else:
         print('dataset statistics')
         all_dataloader = get_dataloaders(config, batch=16, mode='all')
