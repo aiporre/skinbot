@@ -1,12 +1,19 @@
 import os
+
+import pandas as pd
 import torch
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import classification_report, ConfusionMatrixDisplay, confusion_matrix
+
 from skinbot.dataset import get_dataloaders 
 from skinbot.config import read_config
+from skinbot.evaluations import prediction_all_samples, error_analysis
 from skinbot.models import get_model
-from skinbot.transformers import num_classes
+from skinbot.transformers import num_classes, target_str_to_num
 
 from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
-from ignite.metrics import Accuracy, Loss, RunningAverage
+from ignite.metrics import Accuracy, Loss, RunningAverage, ConfusionMatrix
 from ignite.contrib.handlers import ProgressBar
 from ignite.handlers import Checkpoint, global_step_from_engine, DiskSaver
 
@@ -43,15 +50,24 @@ def main():
 
     def pred_in_prob(output):
         y_pred, y = output
-        y_pred_prob = torch.nn.functional.softmax(y_pred, dim=1)
+        y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred_prob, dim=1)
         y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
         y_onehot= torch.nn.functional.one_hot(y, num_classes=num_classes)
         return y_pred_onehot, y_onehot
 
+    def pred_in_onehot(output):
+        y_pred, y = output
+        y_pred_prob = torch.softmax(y_pred, dim=1)
+        y_pred_class = torch.argmax(y_pred_prob, dim=1)
+        y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
+        y = y.long()
+        return y_pred_onehot, y
+
     val_metrics = {
         "accuracy": Accuracy(output_transform=pred_in_prob, is_multilabel=True),
-        "nll": Loss(criterion)
+        "nll": Loss(criterion),
+        "cm": ConfusionMatrix(num_classes=num_classes, output_transform=pred_in_onehot)
     }
 
     evaluator = create_supervised_evaluator(model, metrics=val_metrics)
@@ -120,9 +136,55 @@ def main():
         handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
 
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
+    only_eval = True
+    if not only_eval:
+        trainer.run(train_dataloader, max_epochs=10)
+    else:
+        print('dataset statistics')
+        all_dataloader = get_dataloaders(config, batch=16, mode='all')
+        all_labels = []
+        # collect all labels in a list
+        if os.path.exists('./dataset_statistics.csv'):
+            df_all = pd.read_csv('./dataset_statistics.csv')
+        else:
+            for x,y in all_dataloader:
+                all_labels.extend(y.tolist())
+            df_all = pd.DataFrame(all_labels, columns=['label'])
+            target_num_to_str= {v:k for k,v in target_str_to_num.items()}
+            df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
+            # save the dataset statistics
+            df_all.to_csv('./dataset_statistics.csv', index=False)
+        # sns.set(style="darkgrid")
+        ax = sns.countplot(x="label_name", data=df_all)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
+        ax.set_ylabel('Number of instances')
+        plt.show()
 
+        evaluator.run(test_dataloader)
+        print('evaluator.state.metrics', evaluator.state.metrics)
+        if os.path.exists('./predictions.csv'):
+            df = pd.read_csv('./predictions.csv')
+        else:
+            df = prediction_all_samples(model, test_dataloader)
+            df.to_csv('prediction_results.csv', index=False)
+        print('prediction_results.csv saved')
+        df = error_analysis(df)
+        print('prediction summary: ', df['error'].describe())
+        class_names = list(target_str_to_num.keys())
+        report = classification_report(df['y_true'], df['y_pred'], target_names=class_names)
+        print(report)
 
-    trainer.run(train_dataloader, max_epochs=5)
+        matrix = confusion_matrix(df['y_true'], df['y_pred'])
+        accuracies = matrix.diagonal()/matrix.sum(axis=1)
+        print(' Accuracy per class:')
+        for acc, class_name in zip(accuracies, class_names):
+            print(f'{class_name}: {acc}')
+
+        print('confusion matrix')
+        disp = ConfusionMatrixDisplay(confusion_matrix=evaluator.state.metrics['cm'].numpy(), display_labels=class_names)
+        disp.plot(xticks_rotation='vertical')
+        plt.tight_layout()
+        plt.show()
 
 
 
