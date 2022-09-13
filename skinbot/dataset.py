@@ -154,19 +154,19 @@ class KFold:
         else:
             return [self.image_fnames[i] for i in train_indices]
 
-def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='number'):
+def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
-    assert target in ['onehot', 'number', 'string', 'fuzzy'], "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
-
+    assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple'], "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
+    # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
     fuzzy_labels = False
     if target == 'onehot':
         target_transform = TargetOneHot()
-    elif target == "number":
+    elif target == "single":
         target_transform = TargetValue()
     elif target == 'string':
         target_transform =None
-    elif target == 'fuzzy':
+    elif target == 'fuzzy' or target == 'multiple':
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
     else:
@@ -177,7 +177,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='number'
     if mode == "all":
         transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
-        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
+        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
     elif mode == 'test':
         transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, fuzzy_labels=fuzzy_labels,  transform=transform, target_transform=target_transform)

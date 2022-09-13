@@ -3,18 +3,33 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import torch
 
-def prediction_all_samples(model, dataloader):
+def prediction_all_samples(model, dataloader, fold, fuzzy=False):
     model.eval()
     labels = []
     predictions = []
+    probs = []
+    if fuzzy:
+        labels_fuzzy = []
     with torch.no_grad():
         for batch in dataloader:
             inputs, label = batch
             outputs = model(inputs)
+            prob = torch.softmax(outputs, dim=1)
             _, predicted = torch.max(outputs, 1)
             predictions.extend(predicted.tolist())
+            # if fuzzy we need to compute the index as the max value
+            if fuzzy:
+                labels_fuzzy.extend(label.tolist())
+                print('pa=++++> ', label)
+                label = torch.argmax(label, dim=1)
             labels.extend(label.tolist())
-    return pd.DataFrame( {"y_pred": predictions, "y_true": labels})
+            probs.extend(prob.tolist())
+    if fuzzy:
+        return pd.DataFrame( {"y_pred": predictions, "y_true": labels, "y_prob": probs, "y_true_fuzzy": labels_fuzzy,
+                              'files': dataloader.dataset.image_fnames,
+                              'fold': len(predictions)*[fold]})
+    else:
+        return pd.DataFrame( {"y_pred": predictions, "y_true": labels, "y_prob": probs})
 
 def error_analysis(df):
     df = df.copy()

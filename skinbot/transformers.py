@@ -33,7 +33,7 @@ class TargetValue:
 class FuzzyTargetValue:
     def __call__(self, x):
         values = np.array( [x[k] for k in target_str_to_num.keys()])
-        values = values / np.max(values)
+        values = values / 100  # np.max(values)
         return values
 
 class ToFloat:
