@@ -128,7 +128,6 @@ def main(best_or_last='best',
         "accuracy": Accuracy(output_transform=pred_in_prob, is_multilabel=True),
         "nll": Loss(criterion),
         "cm": ConfusionMatrix(num_classes=num_classes, output_transform=pred_in_onehot),
-        # TODO: arreglar fuzzy_labels is not used anlymore
         'cosine': Loss(CosineLoss()) if target_mode in ['fuzzy', 'multiple'] else Loss(torch.nn.CrossEntropyLoss()),
         'euclidean': Loss(EuclideanLoss()) if target_mode in ['fuzzy', 'multiple'] else Loss(torch.nn.CrossEntropyLoss()),
     }
@@ -256,7 +255,7 @@ def main(best_or_last='best',
         if os.path.exists(predictions_fname):
             df = pd.read_csv(predictions_fname)
         else:
-            df = prediction_all_samples(model, test_dataloader, fold, fuzzy=target_mode)
+            df = prediction_all_samples(model, test_dataloader, fold)
             df.to_csv(predictions_fname, index=False)
         print(df.head())
         print('prediction_results.csv saved')
