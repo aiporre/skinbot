@@ -9,6 +9,7 @@ from sklearn.metrics import classification_report, ConfusionMatrixDisplay, confu
 from skinbot.dataset import get_dataloaders 
 from skinbot.config import read_config
 from skinbot.evaluations import prediction_all_samples, error_analysis
+from skinbot.losses import EuclideanLoss, CosineLoss, MulticlassLoss
 from skinbot.models import get_model
 from skinbot.transformers import num_classes, target_str_to_num
 
@@ -37,36 +38,6 @@ def get_best_iteration(path_models, fold, model_name, target_mode):
     last_iteration_end = f"={last_iteration:.4f}.pt"
     best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end) and p.startswith(prefix)][0]
     return best_model_path
-
-class EuclideanLoss(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.mse = torch.nn.MSELoss()
-    def forward(self, x, y):
-        x = torch.softmax(x, dim=1)
-        y = y.float()
-        return self.mse(x, y)
-
-class CosineLoss(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.cosine = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
-    def forward(self, x, y):
-        x = torch.softmax(x, dim=1)
-        return torch.mean(1 - self.cosine(x, y))
-
-class MulticlassLoss(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.sigmoid = torch.nn.Sigmoid()
-
-    def forward(self, x, y):
-        #x = torch.softmax(x, dim=1)
-        x = self.sigmoid(x)
-        x = torch.clamp(x, min=1e-6)
-        # return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x) - torch.floor(1 - y) * torch.log(1 - x), dim=1))
-        # return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x) - torch.floor(1 - y) * torch.log(1 - x), dim=1))
-        return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x), dim=1))
 
 
 def main(best_or_last='best',

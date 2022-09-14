@@ -21,7 +21,8 @@ def prediction_all_samples(model, dataloader, fold, fuzzy=False):
             if fuzzy:
                 labels_fuzzy.extend(label.tolist())
                 print('pa=++++> ', label)
-                label = torch.argmax(label, dim=1)
+
+                label = torch.argmax(label, dim=1) if len(label.shape) > 1 else label
             labels.extend(label.tolist())
             probs.extend(prob.tolist())
     if fuzzy:

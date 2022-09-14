@@ -41,6 +41,7 @@ target_fix_names = {
 def fix_target(labels):
     labels_fixed = {}
     for fname, fuzzy_labels in labels.items():
+        # changes names to the ones corrected in the dictionary target_fix_names
         fuzzy_labels_fixed = { target_fix_names[k]: v for k,v in fuzzy_labels.items()}
         # setting zero to all the labels that are not present
         for k in target_str_to_num.keys():
