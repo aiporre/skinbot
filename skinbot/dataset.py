@@ -51,7 +51,16 @@ def fix_target(labels):
     return labels_fixed
 
 class WoundImages(Dataset):
-    def __init__(self, root_dir, fold_iteration=None, cross_validation_folds=10, test=False, fuzzy_labels=False, transform=None, target_transform=None):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=10,
+                 test=False,
+                 fuzzy_labels=False,
+                 detection=False,
+                 transform=None,
+                 target_transform=None):
+        # or excusive assertion between detection and fuzzy_labels
+        assert not (detection and fuzzy_labels), 'detection and fuzzy_labels are mutually exclusive'
         if fold_iteration is None:
             self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images")) if not '_mask.' in f]
         else:
@@ -64,6 +73,17 @@ class WoundImages(Dataset):
         self.fuzzy_labels = None
         if fuzzy_labels:
             self.load_fuzzy_labels()
+        if detection:
+            self.load_detection()
+
+    def load_detection(self):
+        self.detection = {}
+        for fname in self.image_fnames:
+            mask_path = os.path.join(self.images_dir,
+                                     fname.replace('.jpg', '_watershed_mask.png')
+                                     .replace('.JPG', '_watershed_mask.png'))
+            mask = read_image(mask_path)
+            self.detection[fname] = mask
 
     def load_fuzzy_labels(self):
         fname_labels = {}

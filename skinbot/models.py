@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
 from torchvision import datasets, models, transforms
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
 from skinbot.transformers import num_classes
 
-def pretrained_model(model_name, num_outputs, freeze=False, pretrained=True):
+def classification_model(model_name, num_outputs, freeze=False, pretrained=True):
     backbone = None
     input_size = 224
     def freeze_model(model):
@@ -20,9 +22,20 @@ def pretrained_model(model_name, num_outputs, freeze=False, pretrained=True):
         raise Exception(f'model name {model_name} is not defined')
     return backbone
 
+def detection_model(model_name, num_classes, pretrained=True):
+    # load an object detection model pre-trained on COCO
+    model = models.detection.fasterrcnn_resnet50_fpn(pretrained=pretrained)
+    # get number of input features for the classifier
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    # replace the pre-trained head with a new one
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    return model
+
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze=False):
     if model_name.startswith('resnet'):
-        model = pretrained_model(model_name, num_outputs=num_classes, freeze=freeze)
+        model = classification_model(model_name, num_outputs=num_classes, freeze=freeze)
+    elif model_name == 'faster_rcnn_resnet50_fpn':
+        model = detection_model(model_name, num_classes)
     else:
         raise Exception(f"Model name {model_name} is not defined.")
     if optimizer is not None:
