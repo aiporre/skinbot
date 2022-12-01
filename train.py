@@ -53,7 +53,8 @@ def main(best_or_last='best',
          device='cuda',
          only_eval=False,
          patience=None,
-         model_path=None):
+         model_path=None,
+         external_data=False):
     # log_interval = 1
     config = read_config()
     # root_dir = config["DATASET"]["root"]
@@ -73,9 +74,9 @@ def main(best_or_last='best',
         device = torch.device('cpu')
     # prepare dataset
     assert target_mode in ['single', 'multiple', 'fuzzy']
-
-    test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=fold, target=target_mode)
-    train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=fold, target=target_mode)
+    _fold = fold if not external_data else None
+    test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=_fold, target=target_mode)
+    train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=_fold, target=target_mode)
     
 
     # prepare models
@@ -245,17 +246,18 @@ def main(best_or_last='best',
         ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
         ax.set_ylabel('Number of instances')
         plt.show()
-
+        print('Running evaluations Train and test (in that order).')
         evaluator.run(train_dataloader)
         print('TRAIN: evaluator.state.metrics', evaluator.state.metrics)
         evaluator.run(test_dataloader)
         print('TEST: evaluator.state.metrics', evaluator.state.metrics)
-        predictions_fname = f'./predictions_fold={fold}_{model_name}_{target_mode}.csv'
+        _fold = fold if not external_data else 'external'
+        predictions_fname = f'./predictions_fold={_fold}_{model_name}_{target_mode}.csv'
 
         if os.path.exists(predictions_fname):
             df = pd.read_csv(predictions_fname)
         else:
-            df = prediction_all_samples(model, test_dataloader, fold)
+            df = prediction_all_samples(model, test_dataloader, fold, target_mode)
             df.to_csv(predictions_fname, index=False)
         print(df.head())
         print('prediction_results.csv saved')
@@ -287,8 +289,10 @@ if __name__ == "__main__":
     model_path = None
     # main(target_mode='multiple', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
-
-    main(target_mode='single', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
+    # single training with split
+    # main(target_mode='single', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
+    # EXTERNAL DATA: single evaluation of external data
+    main(target_mode='single', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True, external_data=True)
 
 
     ## load model path
