@@ -1,13 +1,21 @@
+import json
 import os
 import random
 import csv
+import cv2
 
+import numpy as np
 import pandas as pd
+import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, target_str_to_num, FuzzyTargetValue
 
 # TODO: move to a config file
+LESION_LABEL_ID = 1
+SCALE_LABEL_ID = 2
+BACKGROUND_ID = 0
+
 LABEL_COLUMN_NAMES = ['Image Capture',
                       'Rationale for decision',
                       'Percentages of diagnoses',
@@ -227,8 +235,82 @@ def read_labels_xls(root_dir, concat=True):
     df = pd.concat(tables.values(), ignore_index=True)
     return df
 
+def read_segmentation_json(root_dir):
+    segmentation_file = os.path.join(root_dir, 'labels', "segmentation.json")
+    with open(segmentation_file, 'r') as f:
+        data = json.load(f)
+    return data['labels']
+
+
+def get_lesion_ids(root_dir):
+    segmentation_data = read_segmentation_json(root_dir)
+    colors = {}
+    # get the color if the category is lesion
+    for name, specs in segmentation_data.items():
+        if specs['categorie'] == 'lesion':
+            colors[name] = specs['id']
+    return colors
+
+def lesion_mask_rgb_to_binary(mask, id):
+    # convert the color to a binary mask
+    mask_binary = (mask[0] == id).int()
+    return mask_binary
+
+def get_boxes(mask, obj_ids, obj_label_id):
+    # get the bounding boxes of the objects
+    boxes = []
+    masks = []
+    areas = []
+    labels = []
+    # combine the masks transformed into binary
+    mask_binary = torch.zeros_like(mask[0])
+    for name, id in obj_ids.items():
+        mask_binary += lesion_mask_rgb_to_binary(mask, id)
+    # get the bounding boxes
+    mask_binary = (mask_binary > 0.5).numpy().astype(np.uint8)
+    # get the boxes
+    num_components, components_joint= cv2.connectedComponents(mask_binary)
+    component_ids = list(range(1, num_components))
+    component_masks = components_joint == np.array(component_ids)[:, None, None]
+    for ii, id in enumerate(component_ids):
+        pos = np.where(component_masks[ii])
+        xmin, xmax = (np.min(pos[1]), np.max(pos[1]))
+        ymin, ymax = (np.min(pos[0]), np.max(pos[0]))
+        area = (xmax - xmin) * (ymax - ymin)
+        if area < 224*224:
+            continue
+        areas.append(area)
+        boxes.append([xmin, ymin, xmax, ymax])
+        labels.append(obj_label_id)
+        masks.append(component_masks[ii])
+    return boxes, masks, labels, areas
+
+# def get_lesion_boxes(mask, lesion_ids):
+#     # get the bounding boxes of the lesions
+#     boxes = []
+#     labels = []
+#     masks = []
+#     areas = []
+#     for lesion_id in lesion_ids.values():
+#         print('DEBUG: lesion_id ', lesion_id)
+#         print('DEBUG: mask.shape ', mask.shape)
+#         _mask = lesion_mask_rgb_to_binary(mask, lesion_id).numpy().astype(np.uint8)
+#         # find connected components
+#         num_components, components_joint= cv2.connectedComponents(_mask)
+#         component_ids = list(range(1, num_components))
+#         component_masks = components_joint == np.array(component_ids)[:, None, None]
+#         for ii, id in enumerate(component_ids):
+#             pos = np.where(component_masks[ii])
+#             xmin, xmax = (np.min(pos[1]), np.max(pos[1]))
+#             ymin, ymax = (np.min(pos[0]), np.max(pos[0]))
+#             areas.append((xmax - xmin) * (ymax - ymin))
+#             boxes.append([xmin, ymin, xmax, ymax])
+#             labels.append(lesion_id)
+#             masks.append(component_masks[ii])
+#     return boxes, labels, masks, areas
 
 
 
 
-    
+
+
