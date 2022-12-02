@@ -77,4 +77,13 @@ class Pretrained:
             return self.T['val'](x)
         else:
             return self.T['train'](x)
-        
+
+
+class DetectionTarget:
+    # Applies the transform to the target "image_label" if Target is a "detection" kind of label
+    def __init__(self, target_transform):
+        self.target_transform = target_transform
+    def __call__(self, x):
+        x['image_label'] = self.target_transform(x['image_label'])
+        return x
+

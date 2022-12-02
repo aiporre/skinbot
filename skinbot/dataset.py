@@ -8,8 +8,10 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 from torchvision.io import read_image
-from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, target_str_to_num, FuzzyTargetValue
+from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, target_str_to_num, FuzzyTargetValue, \
+    DetectionTarget
 
 # TODO: move to a config file
 LESION_LABEL_ID = 1
@@ -58,17 +60,27 @@ def fix_target(labels):
         labels_fixed[fname] = fuzzy_labels_fixed
     return labels_fixed
 
+def crop_lesion(img, label):
+    boxes = label['boxes'][label['labels'] == LESION_LABEL_ID]
+    if len(boxes) == 0:
+        return img
+    xmin, ymin, xmax, ymax = min(boxes[:, 0]), min(boxes[:, 1]), max(boxes[:, 2]), max(boxes[:, 3])
+    img = img[:, ymin.int():ymax.int(), xmin.int():xmax.int()]
+    return img
+
 class WoundImages(Dataset):
     def __init__(self, root_dir,
                  fold_iteration=None,
                  cross_validation_folds=10,
                  test=False,
+                 crop_lesion=False,
                  fuzzy_labels=False,
                  detection=False,
                  transform=None,
                  target_transform=None):
         # or excusive assertion between detection and fuzzy_labels
         assert not (detection and fuzzy_labels), 'detection and fuzzy_labels are mutually exclusive'
+        assert not (detection and crop_lesion), 'detection and crop_lesion are mutually exclusive'
         if fold_iteration is None:
             self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images")) if not '_mask.' in f]
         else:
@@ -81,8 +93,10 @@ class WoundImages(Dataset):
         self.fuzzy_labels = None
         if fuzzy_labels:
             self.load_fuzzy_labels()
-        if detection:
+        if detection or crop_lesion:
             self.load_detection()
+        self.create_detection = detection
+        self.crop_lesion = crop_lesion
 
     def load_detection(self):
         self.detection = {}
@@ -156,9 +170,13 @@ class WoundImages(Dataset):
             label = self.image_fnames[index].split("_")[0]
         else:
             label = self.fuzzy_labels[index]
-        if hasattr(self, 'detection'):
+        if self.create_detection:
             label = {'image_label': label}
             label = self.__make_one_detection_label(label, index)
+        if self.crop_lesion:
+            # It uses the detection label if it was created before, otherwise it creates a new one
+            _label = label if self.create_detection else self.__make_one_detection_label({'image_label': label}, index)
+            image = crop_lesion(image, _label)
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
@@ -215,39 +233,70 @@ class KFold:
         else:
             return [self.image_fnames[i] for i in train_indices]
 
+
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
-    assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple'], "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
+    assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple',
+                      'detectionOnehot', 'detectionSingle', 'detectionString',
+                      'cropOnehot', 'cropSingle', 'cropString'], \
+        "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
     fuzzy_labels = False
+    _crop_lesion = False
+    detection = False
     if target == 'onehot':
         target_transform = TargetOneHot()
     elif target == "single":
         target_transform = TargetValue()
     elif target == 'string':
         target_transform =None
+    elif target == 'detectionOnehot':
+        target_transform = TargetOneHot()
+        detection = True
+    elif target == "detectionSingle":
+        target_transform = TargetValue()
+        detection = True
+    elif target == 'detectionString':
+        target_transform = None
+        detection = True
+    elif target == 'cropOnehot':
+        target_transform = TargetOneHot()
+        _crop_lesion = True
+    elif target == "cropSingle":
+        target_transform = TargetValue()
+        _crop_lesion = True
+    elif target == 'cropString':
+        target_transform = None
+        _crop_lesion = True
     elif target == 'fuzzy' or target == 'multiple':
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
     else:
         raise ValueError(f"Invalid target {target}")
 
-    
+    if detection:
+        target_transform = DetectionTarget(target_transform)
+
     # todo: from confing input_size must be generated of input from the get_model 
     if mode == "all":
         transform = Pretrained(test=True)
-        wound_images = WoundImages(root_dir, fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
+        wound_images = WoundImages(root_dir, crop_lesion=_crop_lesion, fuzzy_labels=fuzzy_labels, transform=transform,
+                                   target_transform=target_transform, detection=detection)
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
     elif mode == 'test':
         transform = Pretrained(test=True)
-        wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, fuzzy_labels=fuzzy_labels,  transform=transform, target_transform=target_transform)
+        wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, crop_lesion=_crop_lesion,
+                                   fuzzy_labels=fuzzy_labels,  transform=transform, target_transform=target_transform,
+                                   detection=detection)
 
         # print('DEBUG: lenght of the dataset test: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
     elif mode == 'train':
         transform = Pretrained(test=False)
-        wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
+        wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, crop_lesion=_crop_lesion,
+                                   fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
+                                   detection=detection)
         # print('DEBUG: lenght of the dataset train: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
     return dataloader

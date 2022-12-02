@@ -73,7 +73,8 @@ def main(best_or_last='best',
     else:
         device = torch.device('cpu')
     # prepare dataset
-    assert target_mode in ['single', 'multiple', 'fuzzy']
+    # TODO: just commented here, check if it is necessary
+    # assert target_mode in ['single', 'multiple', 'fuzzy']
     _fold = fold if not external_data else None
     test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=_fold, target=target_mode)
     train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=_fold, target=target_mode)
@@ -284,7 +285,7 @@ def main(best_or_last='best',
 if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
-    # main(target_mode='single', patience=15, epochs=100, fold=0)
+    main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
     # main(target_mode='multiple', patience=15, epochs=100, fold=0)
     model_path = None
     # main(target_mode='multiple', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
@@ -292,7 +293,7 @@ if __name__ == "__main__":
     # single training with split
     # main(target_mode='single', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
     # EXTERNAL DATA: single evaluation of external data
-    main(target_mode='single', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True, external_data=True)
+    # main(target_mode='single', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True, external_data=True)
 
 
     ## load model path
