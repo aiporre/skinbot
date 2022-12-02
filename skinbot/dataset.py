@@ -117,6 +117,35 @@ class WoundImages(Dataset):
         self.image_fnames = list(fname_labels.keys())
         self.fuzzy_labels = list(fname_labels.values())
 
+    def __make_one_detection_label(self, label, index):
+        boxes, labels, masks, areas, iscrowd = [], [], [], [], []
+        # append boxes for lesions
+        mask = self.detection[self.image_fnames[index]]
+        lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
+        lesion_boxes, lesion_labels, lesion_masks, lesion_areas = get_boxes(mask, lesion_ids, LESION_LABEL_ID)
+        boxes.extend(lesion_boxes)
+        labels.extend(lesion_labels)
+        masks.extend(lesion_masks)
+        areas.extend(lesion_areas)
+        iscrowd.extend([0] * len(lesion_boxes))
+        scale_id = {"scale": 13}
+        scale_boxes, scale_labels, scale_masks, scale_areas = get_boxes(mask, scale_id, SCALE_LABEL_ID)
+        boxes.extend(scale_boxes)
+        labels.extend(scale_labels)
+        masks.extend(scale_masks)
+        areas.extend(scale_areas)
+        iscrowd.extend([0] * len(scale_boxes))
+        boxes, labels, masks, areas, iscrowd = np.array(boxes), np.array(labels), np.array(masks), np.array(areas), \
+                                               np.array(iscrowd)
+        # transform to tensor
+        label['boxes'] = torch.as_tensor(boxes, dtype=torch.float32)
+        label['labels'] = torch.as_tensor(labels, dtype=torch.int64)
+        label['masks'] = torch.as_tensor(masks, dtype=torch.uint8)
+        label['areas'] = torch.as_tensor(areas, dtype=torch.float32)
+        label['iscrowd'] = torch.as_tensor(iscrowd, dtype=torch.int64)
+        label['image_id'] = torch.as_tensor(hash(self.image_fnames[index]), dtype=torch.int64)
+        return label
+
     def __len__(self):
         return len(self.image_fnames)
 
@@ -127,6 +156,9 @@ class WoundImages(Dataset):
             label = self.image_fnames[index].split("_")[0]
         else:
             label = self.fuzzy_labels[index]
+        if hasattr(self, 'detection'):
+            label = {'image_label': label}
+            label = self.__make_one_detection_label(label, index)
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
@@ -242,12 +274,12 @@ def read_segmentation_json(root_dir):
     return data['labels']
 
 
-def get_lesion_ids(root_dir):
+def get_ids_by_categorie(root_dir, categorie):
     segmentation_data = read_segmentation_json(root_dir)
     colors = {}
     # get the color if the category is lesion
     for name, specs in segmentation_data.items():
-        if specs['categorie'] == 'lesion':
+        if specs['categorie'] == categorie:
             colors[name] = specs['id']
     return colors
 
@@ -283,7 +315,7 @@ def get_boxes(mask, obj_ids, obj_label_id):
         boxes.append([xmin, ymin, xmax, ymax])
         labels.append(obj_label_id)
         masks.append(component_masks[ii])
-    return boxes, masks, labels, areas
+    return boxes, labels, masks,  areas
 
 # def get_lesion_boxes(mask, lesion_ids):
 #     # get the bounding boxes of the lesions
