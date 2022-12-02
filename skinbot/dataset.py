@@ -91,6 +91,9 @@ class WoundImages(Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.fuzzy_labels = None
+        # fix missing files: removes files that are invalid
+        self.__fix_missing_files()
+
         if fuzzy_labels:
             self.load_fuzzy_labels()
         if detection or crop_lesion:
@@ -106,6 +109,22 @@ class WoundImages(Dataset):
                                      .replace('.JPG', '_watershed_mask.png'))
             mask = read_image(mask_path)
             self.detection[fname] = mask
+
+    def __fix_missing_files(self):
+        # Maintains list of files valid
+        for f in self.image_fnames:
+            # check image path exists
+            if not os.path.exists(os.path.join(self.images_dir, f)):
+                print('File not found: ', f)
+                self.image_fnames.remove(f)
+            # check if watershed mask exists
+            mask_path = os.path.join(self.images_dir,
+                                     f.replace('.jpg', '_watershed_mask.png')
+                                     .replace('.JPG', '_watershed_mask.png'))
+            if not os.path.exists(mask_path):
+                print('File not found: ', mask_path)
+                self.image_fnames.remove(f)
+
 
     def load_fuzzy_labels(self):
         fname_labels = {}
