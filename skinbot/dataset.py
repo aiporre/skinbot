@@ -95,7 +95,6 @@ class WoundImages(Dataset):
         if fold_iteration is None:
             self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images"))
                                 if '_mask.' not in f and '_detection.' not in f]
-            print('DEBUG: ', self.image_fnames)
         else:
             self.kfold = KFold(root_dir, k=cross_validation_folds)
             self.image_fnames = self.kfold.get_split(fold_iteration, test=test)
@@ -109,19 +108,10 @@ class WoundImages(Dataset):
 
         if fuzzy_labels:
             self.load_fuzzy_labels()
-        if detection or crop_lesion:
-            self.load_detection()
+
         self.create_detection = detection
         self.crop_lesion = crop_lesion
 
-    def load_detection(self):
-        self.detection = {}
-        for fname in self.image_fnames:
-            mask_path = os.path.join(self.images_dir,
-                                     fname.replace('.jpg', '_watershed_mask.png')
-                                     .replace('.JPG', '_watershed_mask.png'))
-            mask = read_image(mask_path)
-            self.detection[fname] = mask
 
     def __fix_missing_files(self):
         # Maintains list of files valid
@@ -165,11 +155,23 @@ class WoundImages(Dataset):
         self.image_fnames = list(fname_labels.keys())
         self.fuzzy_labels = list(fname_labels.values())
 
+    def __read_one_detection_mask(self, fname):
+        mask_path = os.path.join(self.images_dir,
+                                 fname.replace('.jpg', '_watershed_mask.png')
+                                 .replace('.JPG', '_watershed_mask.png'))
+        mask = read_image(mask_path)
+        return mask
+
     def __make_one_detection_label(self, label, index):
         boxes, labels, masks, areas, iscrowd = [], [], [], [], []
         # append boxes for lesions
         # first checks if ther is a json and npy lesion file
-        image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        aux_path = os.path.join(self.images_dir, "aux_files")
+        # create aux_files folder if don't exists
+        if not os.path.exists(aux_path):
+            os.makedirs(aux_path)
+        image_path = os.path.join(aux_path, self.image_fnames[index])
+
         detection_json_path = image_path.replace('.jpg', '_detection.json').replace('.JPG', '_detection.json')
         detection_npy_path = image_path.replace('.jpg', '_detection.npy').replace('.JPG', '_detection.npy')
         # if there is a json file and npy masks detections files then use them
@@ -180,23 +182,25 @@ class WoundImages(Dataset):
             boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'],\
                                             detection_json['areas'], detection_json['iscrowd']
         else:
-            mask = self.detection[self.image_fnames[index]]
-            print('DEBUG: mask shape and unique values', mask.shape, torch.unique(mask))
+            mask = self.__read_one_detection_mask(self.image_fnames[index])
             lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
-            print('DEBUG: lesion ids', lesion_ids)
-            lesion_boxes, lesion_labels, lesion_masks, lesion_areas = get_boxes(mask, lesion_ids, LESION_LABEL_ID)
-            boxes.extend(lesion_boxes)
-            labels.extend(lesion_labels)
-            masks.extend(lesion_masks)
-            areas.extend(lesion_areas)
-            iscrowd.extend([0] * len(lesion_boxes))
+            def analyse_mask(mask, obj_ids, label_id):
+                _boxes, _labels, _masks, _areas = get_boxes(mask, obj_ids, label_id)
+                boxes.extend(_boxes)
+                labels.extend(_labels)
+                masks.extend(_masks)
+                areas.extend(_areas)
+                iscrowd.extend([0] * len(_boxes))
+            analyse_mask(mask, lesion_ids, LESION_LABEL_ID)
+            skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
+            skin_ids.pop('blandSkin', None)
+            analyse_mask(mask, skin_ids, LESION_LABEL_ID)
+
+            if len(boxes) == 0:
+                 print('Warning: No lesions found in image', self.image_fnames[index])
+            # getting the scale mask from the image
             scale_id = {"scale": 13}
-            scale_boxes, scale_labels, scale_masks, scale_areas = get_boxes(mask, scale_id, SCALE_LABEL_ID)
-            boxes.extend(scale_boxes)
-            labels.extend(scale_labels)
-            masks.extend(scale_masks)
-            areas.extend(scale_areas)
-            iscrowd.extend([0] * len(scale_boxes))
+            analyse_mask(mask, scale_id, SCALE_LABEL_ID)
             # save mask in npy file
             np.save(detection_npy_path, np.array(masks))
             # other info in json file
@@ -204,9 +208,9 @@ class WoundImages(Dataset):
                               'labels': labels,
                               'areas': areas,
                               'iscrowd': iscrowd}
-            print("DEBUG: ", detection_json)
+            # print("DEBUG: ", detection_json)
             with open(detection_json_path, 'w') as f:
-                json.dump(detection_json, f, cls=NpEncoder)
+               json.dump(detection_json, f, cls=NpEncoder)
         # convert to np.array to speed up conversion to tensor
         boxes, labels, masks, areas, iscrowd = np.array(boxes), np.array(labels), np.array(masks), np.array(areas), \
                                                np.array(iscrowd)
