@@ -129,6 +129,10 @@ class WoundImages(Dataset):
                 print('File not found: ', mask_path)
                 self.image_fnames.remove(f)
                 continue
+            if f == 'aux_files':
+                print('removing aux_files')
+                self.image_fnames.remove(f)
+                continue
 
 
     def load_fuzzy_labels(self):
@@ -228,7 +232,11 @@ class WoundImages(Dataset):
 
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
-        image = read_image(image_path)
+        try:
+            image = read_image(image_path)
+        except Exception as e:
+            print(f'Warning: could not read image {image_path}', e)
+            raise e
         if self.fuzzy_labels is None:
             label = self.image_fnames[index].split("_")[0]
         else:
