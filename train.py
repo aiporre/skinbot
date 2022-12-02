@@ -85,11 +85,11 @@ def main(best_or_last='best',
     # move model to gpu
     model.to(device)
     # make loss according to target mode
-    if target_mode == 'single':
+    if 'single' in target_mode.lower():
         criterion = torch.nn.CrossEntropyLoss()
-    elif target_mode == 'multiple':
+    elif 'multiple' in target_mode.lower():
         criterion = MulticlassLoss()
-    elif target_mode == 'fuzzy':
+    elif 'fuzzy' in target_mode.lower():
         criterion = CosineLoss()
     else:
         raise ValueError(f"target_mode={target_mode} is not supported")

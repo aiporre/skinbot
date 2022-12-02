@@ -68,6 +68,17 @@ def crop_lesion(img, label):
     img = img[:, ymin.int():ymax.int(), xmin.int():xmax.int()]
     return img
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
 class WoundImages(Dataset):
     def __init__(self, root_dir,
                  fold_iteration=None,
@@ -82,7 +93,9 @@ class WoundImages(Dataset):
         assert not (detection and fuzzy_labels), 'detection and fuzzy_labels are mutually exclusive'
         assert not (detection and crop_lesion), 'detection and crop_lesion are mutually exclusive'
         if fold_iteration is None:
-            self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images")) if not '_mask.' in f]
+            self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images"))
+                                if '_mask.' not in f and '_detection.' not in f]
+            print('DEBUG: ', self.image_fnames)
         else:
             self.kfold = KFold(root_dir, k=cross_validation_folds)
             self.image_fnames = self.kfold.get_split(fold_iteration, test=test)
@@ -117,6 +130,7 @@ class WoundImages(Dataset):
             if not os.path.exists(os.path.join(self.images_dir, f)):
                 print('File not found: ', f)
                 self.image_fnames.remove(f)
+                continue
             # check if watershed mask exists
             mask_path = os.path.join(self.images_dir,
                                      f.replace('.jpg', '_watershed_mask.png')
@@ -124,6 +138,7 @@ class WoundImages(Dataset):
             if not os.path.exists(mask_path):
                 print('File not found: ', mask_path)
                 self.image_fnames.remove(f)
+                continue
 
 
     def load_fuzzy_labels(self):
@@ -153,21 +168,46 @@ class WoundImages(Dataset):
     def __make_one_detection_label(self, label, index):
         boxes, labels, masks, areas, iscrowd = [], [], [], [], []
         # append boxes for lesions
-        mask = self.detection[self.image_fnames[index]]
-        lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
-        lesion_boxes, lesion_labels, lesion_masks, lesion_areas = get_boxes(mask, lesion_ids, LESION_LABEL_ID)
-        boxes.extend(lesion_boxes)
-        labels.extend(lesion_labels)
-        masks.extend(lesion_masks)
-        areas.extend(lesion_areas)
-        iscrowd.extend([0] * len(lesion_boxes))
-        scale_id = {"scale": 13}
-        scale_boxes, scale_labels, scale_masks, scale_areas = get_boxes(mask, scale_id, SCALE_LABEL_ID)
-        boxes.extend(scale_boxes)
-        labels.extend(scale_labels)
-        masks.extend(scale_masks)
-        areas.extend(scale_areas)
-        iscrowd.extend([0] * len(scale_boxes))
+        # first checks if ther is a json and npy lesion file
+        image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        detection_json_path = image_path.replace('.jpg', '_detection.json').replace('.JPG', '_detection.json')
+        detection_npy_path = image_path.replace('.jpg', '_detection.npy').replace('.JPG', '_detection.npy')
+        # if there is a json file and npy masks detections files then use them
+        if os.path.exists(detection_json_path) and os.path.exists(detection_npy_path):
+            with open(detection_json_path, 'r') as f:
+                detection_json = json.load(f)
+            masks = [ _ for _ in np.load(detection_npy_path)]
+            boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'],\
+                                            detection_json['areas'], detection_json['iscrowd']
+        else:
+            mask = self.detection[self.image_fnames[index]]
+            print('DEBUG: mask shape and unique values', mask.shape, torch.unique(mask))
+            lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
+            print('DEBUG: lesion ids', lesion_ids)
+            lesion_boxes, lesion_labels, lesion_masks, lesion_areas = get_boxes(mask, lesion_ids, LESION_LABEL_ID)
+            boxes.extend(lesion_boxes)
+            labels.extend(lesion_labels)
+            masks.extend(lesion_masks)
+            areas.extend(lesion_areas)
+            iscrowd.extend([0] * len(lesion_boxes))
+            scale_id = {"scale": 13}
+            scale_boxes, scale_labels, scale_masks, scale_areas = get_boxes(mask, scale_id, SCALE_LABEL_ID)
+            boxes.extend(scale_boxes)
+            labels.extend(scale_labels)
+            masks.extend(scale_masks)
+            areas.extend(scale_areas)
+            iscrowd.extend([0] * len(scale_boxes))
+            # save mask in npy file
+            np.save(detection_npy_path, np.array(masks))
+            # other info in json file
+            detection_json = {'boxes': boxes,
+                              'labels': labels,
+                              'areas': areas,
+                              'iscrowd': iscrowd}
+            print("DEBUG: ", detection_json)
+            with open(detection_json_path, 'w') as f:
+                json.dump(detection_json, f, cls=NpEncoder)
+        # convert to np.array to speed up conversion to tensor
         boxes, labels, masks, areas, iscrowd = np.array(boxes), np.array(labels), np.array(masks), np.array(areas), \
                                                np.array(iscrowd)
         # transform to tensor
@@ -206,7 +246,8 @@ class KFold:
     def __init__(self, root_dir, k=10):
         self.k = k
         self.splits_file = os.path.join(root_dir, f"splits_{k}.txt")
-        self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images")) if not '_mask.' in f]
+        self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images"))
+                            if '_mask.' not in f and '_detection.' not in f]
         self.images_dir = os.path.join(root_dir, "images")
         if not os.path.exists(self.splits_file):
             self.create_splits_file()
