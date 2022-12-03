@@ -73,8 +73,12 @@ def main(best_or_last='best',
     else:
         device = torch.device('cpu')
     # prepare dataset
-    # TODO: just commented here, check if it is necessary
-    # assert target_mode in ['single', 'multiple', 'fuzzy']
+    def validate_target_mode(_target_mode, comparable_items):
+        if any([item in _target_mode.lower() for item in comparable_items]):
+            return True
+        else:
+            return False
+    assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy'])
     _fold = fold if not external_data else None
     test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=_fold, target=target_mode)
     train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=_fold, target=target_mode)
@@ -102,9 +106,10 @@ def main(best_or_last='best',
         y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred, dim=1)
         y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
-        if target_mode in ['fuzzy', 'multiple']:
+        # TODO: fix evaluation broken
+        if validate_target_mode(target_mode, ['fuzzy', 'multiple']):
             y_argmax = torch.argmax(y, dim=1)
-        elif target_mode == 'single':
+        elif 'single' in target_mode.lower():
             y_argmax = y.long()
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
@@ -120,7 +125,7 @@ def main(best_or_last='best',
 
         if target_mode in ['fuzzy', 'multiple']:
             y_argmax = torch.argmax(y, dim=1)
-        elif target_mode == 'single':
+        elif 'single' in target_mode.lower():
             y_argmax = y.long()
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
@@ -130,8 +135,8 @@ def main(best_or_last='best',
         "accuracy": Accuracy(output_transform=pred_in_prob, is_multilabel=True),
         "nll": Loss(criterion),
         "cm": ConfusionMatrix(num_classes=num_classes, output_transform=pred_in_onehot),
-        'cosine': Loss(CosineLoss()) if target_mode in ['fuzzy', 'multiple'] else Loss(torch.nn.CrossEntropyLoss()),
-        'euclidean': Loss(EuclideanLoss()) if target_mode in ['fuzzy', 'multiple'] else Loss(torch.nn.CrossEntropyLoss()),
+        'cosine': Loss(CosineLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
+        'euclidean': Loss(EuclideanLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
     }
 
     evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
