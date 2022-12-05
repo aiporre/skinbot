@@ -18,6 +18,7 @@ def create_config_file():
     config_file.set("LOGGER", "LogFilePath", "./logs")
     config_file.set("LOGGER", "LogFileName", "skin.log")
     config_file.set("LOGGER", "LogLevel", "Info")
+    config_file.set("LOGGER", "logtofile", "False")
 
     # save the config file
 
