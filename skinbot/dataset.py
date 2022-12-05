@@ -2,7 +2,11 @@ import json
 import os
 import random
 import csv
-import cv2
+# try:
+#     import cv2
+# except ImportError:
+#     print("OpenCV is not installed, please install it to use the dataset")
+from skimage.measure import label as skimage_connected_components
 
 import numpy as np
 import pandas as pd
@@ -422,7 +426,8 @@ def get_boxes(mask, obj_ids, obj_label_id):
     # get the bounding boxes
     mask_binary = (mask_binary > 0.5).numpy().astype(np.uint8)
     # get the boxes
-    num_components, components_joint= cv2.connectedComponents(mask_binary)
+    # num_components, components_joint= cv2.connectedComponents(mask_binary)
+    components_joint, num_components = skimage_connected_components(mask_binary, return_num=True)
     component_ids = list(range(1, num_components))
     component_masks = components_joint == np.array(component_ids)[:, None, None]
     for ii, id in enumerate(component_ids):
