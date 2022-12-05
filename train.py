@@ -170,9 +170,12 @@ def main(best_or_last='best',
     if display_info and torch.cuda.is_available():
         from ignite.contrib.metrics import GpuInfo
         GpuInfo().attach(trainer, name='gpu')
-    log_path = get_log_path(config)
-    log_file_handler = open(log_path, 'w')
-    pbar = ProgressBar(persist=True, file=log_file_handler)
+    if config['LOGGER']['logtofile'] == 'True':
+        log_path = get_log_path(config)
+        log_file_handler = open(log_path, 'w')
+        pbar = ProgressBar(persist=True, file=log_file_handler)
+    else:
+        pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
 
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
