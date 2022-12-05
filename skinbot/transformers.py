@@ -16,7 +16,7 @@ fixed_error_labels = {
     'dermatitis': 'contact',
 }
 
-num_classes = 8
+num_classes = len(target_str_to_num)
 
 class TargetOneHot:
     def __init__(self):
@@ -78,12 +78,23 @@ class Pretrained:
         else:
             return self.T['train'](x)
 
+class DetectionPretrained:
+    def __init__(self, test=False):
+        self.test = test
+        T = []
+        T.append(transforms.ConvertImageDtype(torch.float))
+        if not test:
+            T.append(transforms.RandomHorizontalFlip(0.5))
+        self.T = transforms.Compose(T)
+
+    def __call__(self, x):
+        return self.T(x)
 
 class DetectionTarget:
     # Applies the transform to the target "image_label" if Target is a "detection" kind of label
     def __init__(self, target_transform):
         self.target_transform = target_transform
     def __call__(self, x):
-        x['image_label'] = self.target_transform(x['image_label'])
+        x['image_label'] = torch.as_tensor(self.target_transform(x['image_label']))
         return x
 

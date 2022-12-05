@@ -16,7 +16,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.io import read_image
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, target_str_to_num, FuzzyTargetValue, \
-    DetectionTarget
+    DetectionTarget, DetectionPretrained
 
 # TODO: move to a config file
 LESION_LABEL_ID = 1
@@ -230,7 +230,7 @@ class WoundImages(Dataset):
         label['boxes'] = torch.as_tensor(boxes, dtype=torch.float32)
         label['labels'] = torch.as_tensor(labels, dtype=torch.int64)
         label['masks'] = torch.as_tensor(masks, dtype=torch.uint8)
-        label['areas'] = torch.as_tensor(areas, dtype=torch.float32)
+        label['area'] = torch.as_tensor(areas, dtype=torch.float32)
         label['iscrowd'] = torch.as_tensor(iscrowd, dtype=torch.int64)
         label['image_id'] = torch.as_tensor(hash(self.image_fnames[index]), dtype=torch.int64)
         return label
@@ -307,8 +307,8 @@ class KFold:
         logging.info(f'Fold label used as testing set is: {test_target_value}')
         test_indices = list(filter(lambda x: self.fold_indices[x] == test_target_value, range(len(self.fold_indices))))
         train_indices = list(filter(lambda x: self.fold_indices[x] != test_target_value, range(len(self.fold_indices))))
-        logging.debug('DEBuG lend of test indices: %d' % len(test_indices))
-        logging.debug('DEBuG lend of train indices: %d' % len(train_indices))
+        logging.info('Number of indices test : %d' % len(test_indices))
+        logging.info('Number of indices training: %d' % len(train_indices))
         if test:
             return [self.image_fnames[i] for i in test_indices]
         else:
@@ -361,25 +361,31 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
 
     # todo: from confing input_size must be generated of input from the get_model 
     if mode == "all":
-        transform = Pretrained(test=True)
+        transform = Pretrained(test=True) if not detection else DetectionPretrained(test=True)
         wound_images = WoundImages(root_dir, crop_lesion=_crop_lesion, fuzzy_labels=fuzzy_labels, transform=transform,
                                    target_transform=target_transform, detection=detection)
-        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
+        shuffle_dataset = False
     elif mode == 'test':
-        transform = Pretrained(test=True)
+        transform = Pretrained(test=True) if not detection else DetectionPretrained(test=True)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, crop_lesion=_crop_lesion,
                                    fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
                                    detection=detection)
 
-        # logging.debug('DEBUG: lenght of the dataset test: ', len(wound_images) )
-        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
+        shuffle_dataset = False
     elif mode == 'train':
-        transform = Pretrained(test=False)
+        transform = Pretrained(test=False) if not detection else DetectionPretrained(test=False)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, crop_lesion=_crop_lesion,
                                    fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
                                    detection=detection)
-        # logging.debug('DEBUG: lenght of the dataset train: ', len(wound_images) )
-        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
+        shuffle_dataset = True
+    def detection_collate(batch):
+        return tuple(zip(*batch))
+
+    if 'detection' in target:
+        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate)
+    else:
+        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
+
     return dataloader
 
 
