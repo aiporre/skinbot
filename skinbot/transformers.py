@@ -8,12 +8,12 @@ target_str_to_num = {
     'necrosis' :  2,
     'malignant' :  3,
     'pyoderma': 4, 
-    'dermatitis' :  5,
-    'infection' :  6,
-    'bland' : 7
+    'infection' :  5,
+    'bland' : 6
 }
 fixed_error_labels = {
     'vaskulitis': 'vasculitis',
+    'dermatitis': 'contact',
 }
 
 num_classes = 8
