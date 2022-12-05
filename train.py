@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pandas as pd
@@ -38,7 +39,24 @@ def get_best_iteration(path_models, fold, model_name, target_mode):
     last_iteration_end = f"={last_iteration:.4f}.pt"
     best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end) and p.startswith(prefix)][0]
     return best_model_path
+def get_log_path(config):
+    logger_dir = config['LOGGER']['logfilepath']
+    logger_fname = config['LOGGER']['logfilename']
+    return os.path.join(logger_dir, logger_fname)
 
+def configure_logging(config):
+    # configure the logging system
+    logger_dir = config['LOGGER']['logfilepath']
+    logger_fname = config['LOGGER']['logfilename']
+    logger_path = os.path.join(logger_dir, logger_fname)
+    if not os.path.exists(logger_dir):
+        os.makedirs(logger_dir)
+    log_level = config['LOGGER']['loglevel']
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % log_level)
+    print('Logging to: ', logger_path, ' with level: ', log_level)
+    logging.basicConfig(filename=logger_path, filemode='w', level=numeric_level)
 
 def main(best_or_last='best',
          target_mode='single',
@@ -58,6 +76,7 @@ def main(best_or_last='best',
          config_file = 'config.ini'):
     # log_interval = 1
     config = read_config(config_file)
+    configure_logging(config)
     # root_dir = config["DATASET"]["root"]
     # best_or_last = 'best'
     # only_eval = False
@@ -147,7 +166,9 @@ def main(best_or_last='best',
     if display_info and torch.cuda.is_available():
         from ignite.contrib.metrics import GpuInfo
         GpuInfo().attach(trainer, name='gpu')
-    pbar = ProgressBar(persist=True)
+    log_path = get_log_path(config)
+    log_file_handler = open(log_path, 'w')
+    pbar = ProgressBar(persist=True, file=log_file_handler)
     pbar.attach(trainer, metric_names="all")
 
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
@@ -197,7 +218,7 @@ def main(best_or_last='best',
             last_checkpoint_path = os.path.join('models', last_checkpoint_path)
             to_load = to_save
             handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
-            print('loaded last checkpoint', last_checkpoint_path)
+            logging.info(f'loaded last checkpoint {last_checkpoint_path}')
 
     trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
 
@@ -228,13 +249,13 @@ def main(best_or_last='best',
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
             handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
-            print('loaded best model', best_model_path)
+            logging.info(f'loaded best model {best_model_path}')
 
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
     if not only_eval:
         trainer.run(train_dataloader, max_epochs=EPOCHS)
     else:
-        print('dataset statistics')
+        logging.info('dataset statistics')
         all_dataloader = get_dataloaders(config, batch=16, mode='all')
         all_labels = []
         # collect all labels in a list
@@ -253,11 +274,11 @@ def main(best_or_last='best',
         ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
         ax.set_ylabel('Number of instances')
         plt.show()
-        print('Running evaluations Train and test (in that order).')
+        logging.info('Running evaluations Train and test (in that order).')
         evaluator.run(train_dataloader)
-        print('TRAIN: evaluator.state.metrics', evaluator.state.metrics)
+        logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
         evaluator.run(test_dataloader)
-        print('TEST: evaluator.state.metrics', evaluator.state.metrics)
+        logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
         _fold = fold if not external_data else 'external'
         predictions_fname = f'./predictions_fold={_fold}_{model_name}_{target_mode}.csv'
 
@@ -266,21 +287,21 @@ def main(best_or_last='best',
         else:
             df = prediction_all_samples(model, test_dataloader, fold, target_mode)
             df.to_csv(predictions_fname, index=False)
-        print(df.head())
-        print('prediction_results.csv saved')
+        logging.info(df.head())
+        logging.info('prediction_results.csv saved')
         df = error_analysis(df)
-        print('prediction summary: ', df['error'].describe())
+        logging.info(f"prediction summary: { df['error'].describe()}")
         class_names = list(target_str_to_num.keys())
         report = classification_report(df['y_true'], df['y_pred'], labels=range(len(class_names)), target_names=class_names)
-        print(report)
+        logging.info(report)
 
         matrix = confusion_matrix(df['y_true'], df['y_pred'])
         accuracies = matrix.diagonal()/matrix.sum(axis=1)
-        print(' Accuracy per class:')
+        logging.info(' Accuracy per class:')
         for acc, class_name in zip(accuracies, class_names):
-            print(f'{class_name}: {acc}')
+            logging.info(f'{class_name}: {acc}')
 
-        print('confusion matrix')
+        logging.info('confusion matrix')
         disp = ConfusionMatrixDisplay(confusion_matrix=evaluator.state.metrics['cm'].numpy(), display_labels=class_names)
         disp.plot(xticks_rotation='vertical')
         plt.tight_layout()
@@ -289,6 +310,7 @@ def main(best_or_last='best',
 
 
 if __name__ == "__main__":
+
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
@@ -307,5 +329,5 @@ if __name__ == "__main__":
     # model_path = 'best_models/best_fold=0_resnet101_number_model_0_accuracy=0.9333.pt'
     # if model_path is not None:
     #     model.load_state_dict(torch.load(model_path)['model'])
-    #     print('loaded model', model_path)
+    #     logging.info('loaded model', model_path)
 

@@ -2,6 +2,7 @@ import json
 import os
 import random
 import csv
+import logging
 # try:
 #     import cv2
 # except ImportError:
@@ -52,17 +53,19 @@ target_fix_names = {
     'dermatitis': 'dermatitis',
 }
 
+
 def fix_target(labels):
     labels_fixed = {}
     for fname, fuzzy_labels in labels.items():
         # changes names to the ones corrected in the dictionary target_fix_names
-        fuzzy_labels_fixed = { target_fix_names[k]: v for k,v in fuzzy_labels.items()}
+        fuzzy_labels_fixed = {target_fix_names[k]: v for k, v in fuzzy_labels.items()}
         # setting zero to all the labels that are not present
         for k in target_str_to_num.keys():
             if k not in fuzzy_labels_fixed:
                 fuzzy_labels_fixed[k] = 0
         labels_fixed[fname] = fuzzy_labels_fixed
     return labels_fixed
+
 
 def crop_lesion(img, label):
     boxes = label['boxes'][label['labels'] == LESION_LABEL_ID]
@@ -71,6 +74,7 @@ def crop_lesion(img, label):
     xmin, ymin, xmax, ymax = min(boxes[:, 0]), min(boxes[:, 1]), max(boxes[:, 2]), max(boxes[:, 3])
     img = img[:, ymin.int():ymax.int(), xmin.int():xmax.int()]
     return img
+
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -97,8 +101,8 @@ class WoundImages(Dataset):
         assert not (detection and fuzzy_labels), 'detection and fuzzy_labels are mutually exclusive'
         assert not (detection and crop_lesion), 'detection and crop_lesion are mutually exclusive'
         if fold_iteration is None:
-            self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images"))
-                                if '_mask.' not in f and '_detection.' not in f]
+            self.image_fnames = [f for f in os.listdir(os.path.join(root_dir, "images"))
+                                 if '_mask.' not in f and '_detection.' not in f]
         else:
             self.kfold = KFold(root_dir, k=cross_validation_folds)
             self.image_fnames = self.kfold.get_split(fold_iteration, test=test)
@@ -116,13 +120,12 @@ class WoundImages(Dataset):
         self.create_detection = detection
         self.crop_lesion = crop_lesion
 
-
     def __fix_missing_files(self):
         # Maintains list of files valid
         for f in self.image_fnames:
             # check image path exists
             if not os.path.exists(os.path.join(self.images_dir, f)):
-                print('File not found: ', f)
+                logging.info('File not found: %s' % f)
                 self.image_fnames.remove(f)
                 continue
             # check if watershed mask exists
@@ -130,14 +133,13 @@ class WoundImages(Dataset):
                                      f.replace('.jpg', '_watershed_mask.png')
                                      .replace('.JPG', '_watershed_mask.png'))
             if not os.path.exists(mask_path):
-                print('File not found: ', mask_path)
+                logging.info('File not found: %s' % mask_path)
                 self.image_fnames.remove(f)
                 continue
             if f == 'aux_files':
-                print('removing aux_files')
+                logging.info('removing aux_files')
                 self.image_fnames.remove(f)
                 continue
-
 
     def load_fuzzy_labels(self):
         fname_labels = {}
@@ -145,9 +147,9 @@ class WoundImages(Dataset):
         for fname in self.image_fnames:
             image_capture = list(filter(lambda x: fname.startswith(x), labels['Image Capture']))
             if len(image_capture) > 1:
-                print('Warning: more that one matching for file')
+                logging.info('Warning: more that one matching for file')
             elif len(image_capture) == 0:
-                print('Warning: image filename has no matching image capture entry')
+                logging.info('Warning: image filename has no matching image capture entry')
                 continue
             image_capture = image_capture[0]
             label = labels['Percentages of diagnoses'].loc[labels['Image Capture'] == image_capture]
@@ -156,7 +158,7 @@ class WoundImages(Dataset):
             try:
                 values = {x.split('%')[1].strip(): float(x.split('%')[0]) for x in label.split(',')}
             except Exception as e:
-                print(f'Warining: parsing label "{label}" string in xlsx table', e)
+                logging.info(f'Warning: parsing label "{label}" string in xlsx table. Error: {e}')
                 continue
             fname_labels[fname] = values
         fname_labels = fix_target(fname_labels)
@@ -186,12 +188,13 @@ class WoundImages(Dataset):
         if os.path.exists(detection_json_path) and os.path.exists(detection_npy_path):
             with open(detection_json_path, 'r') as f:
                 detection_json = json.load(f)
-            masks = [ _ for _ in np.load(detection_npy_path)]
-            boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'],\
+            masks = [_ for _ in np.load(detection_npy_path)]
+            boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'], \
                                             detection_json['areas'], detection_json['iscrowd']
         else:
             mask = self.__read_one_detection_mask(self.image_fnames[index])
             lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
+
             def analyse_mask(mask, obj_ids, label_id):
                 _boxes, _labels, _masks, _areas = get_boxes(mask, obj_ids, label_id)
                 boxes.extend(_boxes)
@@ -199,13 +202,14 @@ class WoundImages(Dataset):
                 masks.extend(_masks)
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
+
             analyse_mask(mask, lesion_ids, LESION_LABEL_ID)
             skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
             skin_ids.pop('blandSkin', None)
             analyse_mask(mask, skin_ids, LESION_LABEL_ID)
 
             if len(boxes) == 0:
-                 print('Warning: No lesions found in image', self.image_fnames[index])
+                logging.warning(f'Warning: No lesions found in image {self.image_fnames[index]}')
             # getting the scale mask from the image
             scale_id = {"scale": 13}
             analyse_mask(mask, scale_id, SCALE_LABEL_ID)
@@ -216,9 +220,9 @@ class WoundImages(Dataset):
                               'labels': labels,
                               'areas': areas,
                               'iscrowd': iscrowd}
-            # print("DEBUG: ", detection_json)
+            logging.debug(f"Resulting detection json: {detection_json}.")
             with open(detection_json_path, 'w') as f:
-               json.dump(detection_json, f, cls=NpEncoder)
+                json.dump(detection_json, f, cls=NpEncoder)
         # convert to np.array to speed up conversion to tensor
         boxes, labels, masks, areas, iscrowd = np.array(boxes), np.array(labels), np.array(masks), np.array(areas), \
                                                np.array(iscrowd)
@@ -239,7 +243,7 @@ class WoundImages(Dataset):
         try:
             image = read_image(image_path)
         except Exception as e:
-            print(f'Warning: could not read image {image_path}', e)
+            logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
         if self.fuzzy_labels is None:
             label = self.image_fnames[index].split("_")[0]
@@ -258,12 +262,13 @@ class WoundImages(Dataset):
             label = self.target_transform(label)
         return image, label
 
+
 class KFold:
     def __init__(self, root_dir, k=10):
         self.k = k
         self.splits_file = os.path.join(root_dir, f"splits_{k}.txt")
-        self.image_fnames= [f for f in os.listdir(os.path.join(root_dir, "images"))
-                            if '_mask.' not in f and '_detection.' not in f]
+        self.image_fnames = [f for f in os.listdir(os.path.join(root_dir, "images"))
+                             if '_mask.' not in f and '_detection.' not in f]
         self.images_dir = os.path.join(root_dir, "images")
         if not os.path.exists(self.splits_file):
             self.create_splits_file()
@@ -274,15 +279,15 @@ class KFold:
         fold_num = N // self.k
         fold_extra_samples = N % self.k
 
-        fold_indices = [[i]*fold_num for i in range(self.k)]
+        fold_indices = [[i] * fold_num for i in range(self.k)]
         if fold_extra_samples > 0:
-            fold_indices[0] = fold_indices[0] + [0]*fold_extra_samples
+            fold_indices[0] = fold_indices[0] + [0] * fold_extra_samples
         fold_indices_flat = []
         for x in fold_indices:
             fold_indices_flat.extend(x)
         random.shuffle(fold_indices_flat)
         with open(self.splits_file, "w", newline='') as f:
-            file_writer = csv.writer(f,  delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            file_writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             file_writer.writerow(['fname', 'fold'])
             for (fname, index) in zip(self.image_fnames, fold_indices_flat):
                 file_writer.writerow([fname, index])
@@ -292,18 +297,18 @@ class KFold:
         with open(self.splits_file, mode='r', newline='') as f:
             file_reader = csv.DictReader(f, delimiter=',')
             for row in file_reader:
-                # print('DEBUG row[fold] = ', row['fold'])
+                logging.debug(f"row[fold] = {row['fold']}")
                 fold_indices.append(int(row['fold']))
         return fold_indices
 
     def get_split(self, fold_iteration, test=False):
-        assert fold_iteration>=0 and fold_iteration<=self.k-1, f"fold iteration must be between 0 and {self.k-1}"
+        assert fold_iteration >= 0 and fold_iteration <= self.k - 1, f"fold iteration must be between 0 and {self.k - 1}"
         test_target_value = self.k - fold_iteration - 1
-        print('DEBUG: test_target_value ', test_target_value)
+        logging.info(f'Fold label used as testing set is: {test_target_value}')
         test_indices = list(filter(lambda x: self.fold_indices[x] == test_target_value, range(len(self.fold_indices))))
         train_indices = list(filter(lambda x: self.fold_indices[x] != test_target_value, range(len(self.fold_indices))))
-        print('DEBuG lend of test indices: ', len(test_indices))
-        print('DEBuG lend of train indices: ', len(train_indices))
+        logging.debug('DEBuG lend of test indices: %d' % len(test_indices))
+        logging.debug('DEBuG lend of train indices: %d' % len(train_indices))
         if test:
             return [self.image_fnames[i] for i in test_indices]
         else:
@@ -326,7 +331,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     elif target == "single":
         target_transform = TargetValue()
     elif target == 'string':
-        target_transform =None
+        target_transform = None
     elif target == 'detectionOnehot':
         target_transform = TargetOneHot()
         detection = True
@@ -363,17 +368,17 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     elif mode == 'test':
         transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, crop_lesion=_crop_lesion,
-                                   fuzzy_labels=fuzzy_labels,  transform=transform, target_transform=target_transform,
+                                   fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
                                    detection=detection)
 
-        # print('DEBUG: lenght of the dataset test: ', len(wound_images) )
+        # logging.debug('DEBUG: lenght of the dataset test: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=False)
     elif mode == 'train':
         transform = Pretrained(test=False)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, crop_lesion=_crop_lesion,
                                    fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
                                    detection=detection)
-        # print('DEBUG: lenght of the dataset train: ', len(wound_images) )
+        # logging.debug('DEBUG: lenght of the dataset train: ', len(wound_images) )
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=True)
     return dataloader
 
@@ -392,6 +397,7 @@ def read_labels_xls(root_dir, concat=True):
     df = pd.concat(tables.values(), ignore_index=True)
     return df
 
+
 def read_segmentation_json(root_dir):
     segmentation_file = os.path.join(root_dir, 'labels', "segmentation.json")
     with open(segmentation_file, 'r') as f:
@@ -408,10 +414,12 @@ def get_ids_by_categorie(root_dir, categorie):
             colors[name] = specs['id']
     return colors
 
+
 def lesion_mask_rgb_to_binary(mask, id):
     # convert the color to a binary mask
     mask_binary = (mask[0] == id).int()
     return mask_binary
+
 
 def get_boxes(mask, obj_ids, obj_label_id):
     # get the bounding boxes of the objects
@@ -435,40 +443,10 @@ def get_boxes(mask, obj_ids, obj_label_id):
         xmin, xmax = (np.min(pos[1]), np.max(pos[1]))
         ymin, ymax = (np.min(pos[0]), np.max(pos[0]))
         area = (xmax - xmin) * (ymax - ymin)
-        if area < 224*224:
+        if area < 224 * 224:
             continue
         areas.append(area)
         boxes.append([xmin, ymin, xmax, ymax])
         labels.append(obj_label_id)
         masks.append(component_masks[ii])
-    return boxes, labels, masks,  areas
-
-# def get_lesion_boxes(mask, lesion_ids):
-#     # get the bounding boxes of the lesions
-#     boxes = []
-#     labels = []
-#     masks = []
-#     areas = []
-#     for lesion_id in lesion_ids.values():
-#         print('DEBUG: lesion_id ', lesion_id)
-#         print('DEBUG: mask.shape ', mask.shape)
-#         _mask = lesion_mask_rgb_to_binary(mask, lesion_id).numpy().astype(np.uint8)
-#         # find connected components
-#         num_components, components_joint= cv2.connectedComponents(_mask)
-#         component_ids = list(range(1, num_components))
-#         component_masks = components_joint == np.array(component_ids)[:, None, None]
-#         for ii, id in enumerate(component_ids):
-#             pos = np.where(component_masks[ii])
-#             xmin, xmax = (np.min(pos[1]), np.max(pos[1]))
-#             ymin, ymax = (np.min(pos[0]), np.max(pos[0]))
-#             areas.append((xmax - xmin) * (ymax - ymin))
-#             boxes.append([xmin, ymin, xmax, ymax])
-#             labels.append(lesion_id)
-#             masks.append(component_masks[ii])
-#     return boxes, labels, masks, areas
-
-
-
-
-
-
+    return boxes, labels, masks, areas
