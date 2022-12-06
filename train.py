@@ -12,14 +12,10 @@ from skinbot.config import read_config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator
 from skinbot.evaluations import prediction_all_samples, error_analysis
-from skinbot.losses import EuclideanLoss, CosineLoss, MulticlassLoss
 from skinbot.models import get_model
 from skinbot.transformers import num_classes, target_str_to_num
 
-from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
-from ignite.metrics import Accuracy, Loss, RunningAverage, ConfusionMatrix
-from ignite.contrib.handlers import ProgressBar
-from ignite.handlers import Checkpoint, global_step_from_engine, DiskSaver, EarlyStopping
+
 
 from skinbot.utils import validate_target_mode, configure_logging
 
@@ -142,10 +138,12 @@ def main(best_or_last='best',
 
 
 if __name__ == "__main__":
+
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
-    main(target_mode='detectionSingle', model_name='faster_rcnn_resnet50_fpn', patience=15, epochs=100, fold=0)
+    main(target_mode='single', patience=15, epochs=100, fold=0, config_file='config_old.ini')
+    # main(target_mode='detectionSingle', model_name='faster_rcnn_resnet50_fpn', patience=15, epochs=100, fold=0)
     # main(target_mode='multiple', patience=15, epochs=100, fold=0)
     model_path = None
     # main(target_mode='multiple', patience=15, epochs=100, fold=0, model_path=model_path, only_eval=True)
