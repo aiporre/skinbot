@@ -11,7 +11,7 @@ from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage
 from torch import distributed as dist
 
 from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
-from skinbot.transformers import num_classes
+from skinbot.transformers import num_classes, target_weights
 from skinbot.utils import validate_target_mode, get_log_path
 
 
@@ -124,7 +124,11 @@ def create_detection_evaluator(model, device=None):
 def create_classification_trainer(model, optimizer, target_mode, device=None):
     # make loss according to target mode
     if 'single' in target_mode.lower():
-        criterion = torch.nn.CrossEntropyLoss()
+        # compute inverse of class weights
+        v_max = max(target_weights.values())
+        target_values_norm = [v_max / v for v in target_weights.values()]
+        target_weights_tensor = torch.tensor(target_values_norm, dtype=torch.float32, device=device)
+        criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
     elif 'multiple' in target_mode.lower():
         criterion = MulticlassLoss()
     elif 'fuzzy' in target_mode.lower():
@@ -291,8 +295,10 @@ def configure_engines(model,
         if best_model_path is not None:
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
-            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
             logging.info(f'loaded best model {best_model_path}')
+            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+        else:
+            logging.info(f'No best model found. starting from scratch')
 
     evaluator.add_event_handler(Events.COMPLETED, handler_best)
     return trainer, evaluator

@@ -11,6 +11,18 @@ target_str_to_num = {
     'infection' :  5,
     'bland' : 6
 }
+
+
+target_weights = {
+    'contact' :  0.08,
+    'vasculitis' :  0.05,
+    'necrosis' :  0.05,
+    'malignant' :  0.23,
+    'pyoderma': 0.07,
+    'infection' :  0.20,
+    'bland' : 0.29
+}
+
 fixed_error_labels = {
     'vaskulitis': 'vasculitis',
     'dermatitis': 'contact',
