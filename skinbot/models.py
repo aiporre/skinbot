@@ -13,7 +13,9 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
             p.requires_grad = False
 
     if model_name == 'resnet101':
-        backbone = models.resnet101(pretrained=pretrained)
+        weights = models.ResNet101_Weights.DEFAULT # if pretrained else None
+        T = weights.transforms()
+        backbone = models.resnet101(weights=weights)
         if freeze:
             freeze_model(backbone)
         num_features = backbone.fc.in_features
