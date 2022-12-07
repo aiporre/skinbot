@@ -21,7 +21,7 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
                 instances.append(nn.Dropout(dropout))
             num_inputs = l
         instances.append(nn.Linear(num_inputs, num_outputs))
-        return nn.Sequential(instances)
+        return nn.Sequential(*instances)
 
     if model_name == 'resnet101':
         weights = models.ResNet101_Weights.DEFAULT # if pretrained else None
