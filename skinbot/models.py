@@ -11,6 +11,17 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
     def freeze_model(model):
         for p in model.parameters():
             p.requires_grad = False
+    def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
+        layers = [1024, 512] if layers is None else layers
+        instances = []
+        for l in layers:
+            instances.append(nn.Linear(num_inputs, l))
+            instances.append(nn.ReLU())
+            if dropout > 0:
+                instances.append(nn.Dropout(dropout))
+            num_inputs = l
+        instances.append(nn.Linear(num_inputs, num_outputs))
+        return nn.Sequential(instances)
 
     if model_name == 'resnet101':
         weights = models.ResNet101_Weights.DEFAULT # if pretrained else None
@@ -19,7 +30,7 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
         if freeze:
             freeze_model(backbone)
         num_features = backbone.fc.in_features
-        backbone.fc = nn.Linear(num_features, num_outputs)
+        backbone.fc = get_mlp(num_features, num_outputs) #nn.Linear(num_features, num_outputs)
     else:
         raise Exception(f'model name {model_name} is not defined')
     return backbone
