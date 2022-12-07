@@ -12,7 +12,7 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
         for p in model.parameters():
             p.requires_grad = False
     def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
-        layers = [1024, 512] if layers is None else layers
+        layers = [1024] if layers is None else layers
         instances = []
         for l in layers:
             instances.append(nn.Linear(num_inputs, l))

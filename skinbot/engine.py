@@ -29,6 +29,8 @@ def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration
         # sort checkpoints by creation time
         checkpoints = sorted(checkpoints, key=lambda x: os.path.getctime(os.path.join(path_models, x)))
         # return the last checkpoint created
+        if len(checkpoints) == 0:
+            return None
         return checkpoints[-1]
 
 def get_best_iteration(path_models, fold, model_name, target_mode):
