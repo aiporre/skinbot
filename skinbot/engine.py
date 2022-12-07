@@ -15,14 +15,21 @@ from skinbot.transformers import num_classes, target_weights
 from skinbot.utils import validate_target_mode, get_log_path
 
 
-def get_last_checkpoint(path_models, fold, model_name, target_mode):
+def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration=False):
     prefix = f"last_fold={fold}_{model_name}_{target_mode}_checkpoint"
-    iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
-    iterations = [int(ii) for ii in iterations if ii.isnumeric()]
-    if len(iterations) == 0:
-        return None
-    last_iteration = max(iterations)
-    return f"{prefix}_{last_iteration}.pt"
+    if by_iteration:
+        iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+        iterations = [int(ii) for ii in iterations if ii.isnumeric()]
+        if len(iterations) == 0:
+            return None
+        last_iteration = max(iterations)
+        return f"{prefix}_{last_iteration}.pt"
+    else:
+        checkpoints = [p for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+        # sort checkpoints by creation time
+        checkpoints = sorted(checkpoints, key=lambda x: os.path.getctime(os.path.join(path_models, x)))
+        # return the last checkpoint created
+        return checkpoints[-1]
 
 def get_best_iteration(path_models, fold, model_name, target_mode):
     prefix = f"best_fold={fold}_{model_name}_{target_mode}_model"
