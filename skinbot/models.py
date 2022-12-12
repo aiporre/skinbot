@@ -5,6 +5,10 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from skinbot.transformers import num_classes
 
+class PlainLayer(nn.Module):
+    def forward(self, x):
+        return x
+
 def classification_model(model_name, num_outputs, freeze=False, pretrained=True):
     backbone = None
     input_size = 224
@@ -31,6 +35,14 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
             freeze_model(backbone)
         num_features = backbone.fc.in_features
         backbone.fc = get_mlp(num_features, num_outputs) #nn.Linear(num_features, num_outputs)
+    elif model_name == 'resnet50':
+        weights = models.ResNet50_Weights.DEFAULT  # if pretrained else None
+        T = weights.transforms()
+        backbone = models.resnet50(weights=weights)
+        if freeze:
+            freeze_model(backbone)
+        num_features = backbone.fc.in_features
+        backbone.fc = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
     else:
         raise Exception(f'model name {model_name} is not defined')
     return backbone
