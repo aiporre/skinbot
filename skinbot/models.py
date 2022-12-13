@@ -5,6 +5,41 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from skinbot.transformers import num_classes
 
+
+def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
+    layers = [1024] if layers is None else layers
+    instances = []
+    for l in layers:
+        instances.append(nn.Linear(num_inputs, l))
+        instances.append(nn.ReLU())
+        if dropout > -1:
+            instances.append(nn.Dropout(dropout))
+        num_inputs = l
+    instances.append(nn.Linear(num_inputs, num_outputs))
+    return nn.Sequential(*instances)
+
+
+class SmallCNN(nn.Module):
+    # four layers convolutiona network with input 224x224x3
+    def __init__(self, num_classes=2):
+        super(SmallCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, 3, padding='same')
+        self.conv2 = nn.Conv2d(16, 32, 3, padding='same')
+        self.conv3 = nn.Conv2d(32, 64, 3, padding='same')
+        self.conv4 = nn.Conv2d(64, 128, 3, padding='same')
+        self.pool = nn.MaxPool2d(2, 2)
+        self.num_middle = 128 * 14 * 14
+        self.fc = get_mlp(self.num_middle, num_classes, layers=[1024], dropout=0.5)
+
+    def forward(self, x):
+        x = self.pool(nn.ReLU()(self.conv1(x)))
+        x = self.pool(nn.ReLU()(self.conv2(x)))
+        x = self.pool(nn.ReLU()(self.conv3(x)))
+        x = self.pool(nn.ReLU()(self.conv4(x)))
+        x = torch.flatten(x, 1)
+        x= self.fc(x)
+        return x
+
 class PlainLayer(nn.Module):
     def forward(self, x):
         return x
@@ -15,18 +50,6 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
     def freeze_model(model):
         for p in model.parameters():
             p.requires_grad = False
-    def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
-        layers = [1024] if layers is None else layers
-        instances = []
-        for l in layers:
-            instances.append(nn.Linear(num_inputs, l))
-            instances.append(nn.ReLU())
-            if dropout > 0:
-                instances.append(nn.Dropout(dropout))
-            num_inputs = l
-        instances.append(nn.Linear(num_inputs, num_outputs))
-        return nn.Sequential(*instances)
-
     if model_name == 'resnet101':
         weights = models.ResNet101_Weights.DEFAULT # if pretrained else None
         T = weights.transforms()
@@ -43,6 +66,8 @@ def classification_model(model_name, num_outputs, freeze=False, pretrained=True)
             freeze_model(backbone)
         num_features = backbone.fc.in_features
         backbone.fc = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+    elif model_name.lower() == 'smallcnn':
+        backbone = SmallCNN(num_classes=num_outputs)
     else:
         raise Exception(f'model name {model_name} is not defined')
     return backbone
@@ -57,7 +82,8 @@ def detection_model(model_name, num_classes, pretrained=True):
     return model
 
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze=False):
-    if model_name.startswith('resnet'):
+    model_name = model_name.lower()
+    if model_name.startswith('resnet') or model_name == 'smallcnn':
         model = classification_model(model_name, num_outputs=num_classes, freeze=freeze)
     elif model_name == 'faster_rcnn_resnet50_fpn':
         model = detection_model(model_name, num_classes)
