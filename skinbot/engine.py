@@ -44,6 +44,19 @@ def get_best_iteration(path_models, fold, model_name, target_mode):
     best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end) and p.startswith(prefix)][0]
     return best_model_path
 
+def keep_best_two(path_models, fold, model_name, target_mode):
+    prefix = f"best_fold={fold}_{model_name}_{target_mode}_model"
+    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+    if len(iterations) < 2:
+        return
+    iterations = [float(ii) for ii in iterations]
+    iterations = sorted(iterations, reverse=True)
+    iterations_to_remove = iterations[2:]
+    for iteration in iterations_to_remove:
+        iteration_end = f"={iteration:.4f}.pt"
+        best_model_path = [p for p in os.listdir(path_models) if p.endswith(iteration_end) and p.startswith(prefix)][0]
+        os.remove(os.path.join(path_models, best_model_path))
+
 def prepare_batch(batch, device=None):
     x, y = batch
     x = list(xx.to(device, non_blocking=True) for xx in x)
@@ -297,14 +310,20 @@ def configure_engines(model,
     )
 
     if best_or_last == 'best':
+        # get the best model path
         if model_path is not None:
             best_model_path = model_path
         else:
+            # keeps the best_models directory clean
+            keep_best_two('best_models', fold, model_name, target_mode)
+            # get the best model path
             best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+
+        # if success then load the best model
         if best_model_path is not None:
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
-            logging.info(f'loaded best model {best_model_path}')
+            logging.info(f'Loaded best model {best_model_path}')
             handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
         else:
             logging.info(f'No best model found. starting from scratch')
