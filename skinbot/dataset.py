@@ -90,7 +90,7 @@ class NpEncoder(json.JSONEncoder):
 class WoundImages(Dataset):
     def __init__(self, root_dir,
                  fold_iteration=None,
-                 cross_validation_folds=10,
+                 cross_validation_folds=5,
                  test=False,
                  crop_lesion=False,
                  fuzzy_labels=False,
