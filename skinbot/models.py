@@ -1,3 +1,5 @@
+import logging
+
 import torch
 import torch.nn as nn
 from torchvision import datasets, models, transforms
@@ -44,26 +46,45 @@ class PlainLayer(nn.Module):
     def forward(self, x):
         return x
 
-def classification_model(model_name, num_outputs, freeze=False, pretrained=True):
+def print_trainable_parameters(model):
+    for n, p in model.named_parameters():
+        if p.requires_grad:
+            logging.info(n)
+
+def classification_model(model_name, num_outputs, freeze='No', pretrained=True):
+    freeze = freeze.lower()
     backbone = None
     input_size = 224
     def freeze_model(model):
         for p in model.parameters():
             p.requires_grad = False
+    def freeze_before_conv(model, last_conv):
+        for n, p in model.named_parameters():
+            if n.startswith(last_conv):
+                break
+            p.requires_grad = False
     if model_name == 'resnet101':
         weights = models.ResNet101_Weights.DEFAULT # if pretrained else None
         T = weights.transforms()
         backbone = models.resnet101(weights=weights)
-        if freeze:
+        if freeze == 'yes':
             freeze_model(backbone)
+        elif freeze != 'no':
+            freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
         backbone.fc = get_mlp(num_features, num_outputs) #nn.Linear(num_features, num_outputs)
     elif model_name == 'resnet50':
         weights = models.ResNet50_Weights.DEFAULT  # if pretrained else None
         T = weights.transforms()
         backbone = models.resnet50(weights=weights)
-        if freeze:
+        if freeze == 'yes':
             freeze_model(backbone)
+        elif freeze != 'no':
+            freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
         backbone.fc = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
     elif model_name.lower() == 'smallcnn':
@@ -81,7 +102,7 @@ def detection_model(model_name, num_classes, pretrained=True):
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
 
-def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze=False):
+def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name == 'smallcnn':
         model = classification_model(model_name, num_outputs=num_classes, freeze=freeze)
