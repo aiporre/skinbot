@@ -5,7 +5,9 @@ import torch.nn as nn
 from torchvision import datasets, models, transforms
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
-from skinbot.transformers import num_classes
+from skinbot.config import Config
+
+C = Config()
 
 
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
@@ -43,7 +45,8 @@ class SmallCNN(nn.Module):
         return x
 
 class PlainLayer(nn.Module):
-    def forward(self, x):
+    @staticmethod
+    def forward(x):
         return x
 
 def print_trainable_parameters(model):
@@ -105,9 +108,9 @@ def detection_model(model_name, num_classes, pretrained=True):
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name == 'smallcnn':
-        model = classification_model(model_name, num_outputs=num_classes, freeze=freeze)
+        model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze)
     elif model_name == 'faster_rcnn_resnet50_fpn':
-        model = detection_model(model_name, num_classes)
+        model = detection_model(model_name, C.labels.num_classes)
     else:
         raise Exception(f"Model name {model_name} is not defined.")
     if optimizer is not None:

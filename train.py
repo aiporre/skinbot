@@ -8,17 +8,18 @@ import seaborn as sns
 from sklearn.metrics import classification_report, ConfusionMatrixDisplay, confusion_matrix
 
 from skinbot.dataset import get_dataloaders
-from skinbot.config import read_config
+from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator
 from skinbot.evaluations import prediction_all_samples, error_analysis
 from skinbot.models import get_model
-from skinbot.transformers import num_classes, target_str_to_num
+# from skinbot.transformers import num_classes, target_str_to_num
 
 
 
 from skinbot.utils import validate_target_mode, configure_logging
 
+C = Config()
 
 def main(best_or_last='best',
          target_mode='single',
@@ -38,6 +39,8 @@ def main(best_or_last='best',
          config_file='config.ini'):
     # log_interval = 1
     config = read_config(config_file)
+    C = Config()
+    C.set_config(config)
     configure_logging(config)
     # root_dir = config["DATASET"]["root"]
     # best_or_last = 'best'
@@ -92,7 +95,7 @@ def main(best_or_last='best',
             for x, y in all_dataloader:
                 all_labels.extend(y.tolist())
             df_all = pd.DataFrame(all_labels, columns=['label'])
-            target_num_to_str = {v: k for k, v in target_str_to_num.items()}
+            target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
             df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
             # save the dataset statistics
             df_all.to_csv('./dataset_statistics.csv', index=False)
@@ -118,7 +121,7 @@ def main(best_or_last='best',
         logging.info('prediction_results.csv saved')
         df = error_analysis(df)
         logging.info(f"prediction summary: {df['error'].describe()}")
-        class_names = list(target_str_to_num.keys())
+        class_names = list(C.labels.target_str_to_num.keys())
         report = classification_report(df['y_true'], df['y_pred'], labels=range(len(class_names)),
                                        target_names=class_names)
         logging.info(report)
@@ -142,7 +145,7 @@ if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
-    main(target_mode='single', patience=15, epochs=100, fold=0, config_file='config_old.ini', model_name='resnet50',)
+    main(target_mode='single', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='resnet50',)
     # main(target_mode='detectionSingle', model_name='faster_rcnn_resnet50_fpn', patience=15, epochs=100, fold=0)
     # main(target_mode='multiple', patience=15, epochs=100, fold=0)
     model_path = None

@@ -7,7 +7,9 @@ import pandas as pd
 
 from skinbot.config import read_config
 from skinbot.dataset import WoundImages
-from skinbot.transformers import fixed_error_labels
+from skinbot.config import Config
+
+C = Config()
 
 
 def get_dataset_where(config1, config2):
@@ -28,8 +30,8 @@ def get_dataset_where(config1, config2):
     labels = [ff.split("_")[0].strip().lower() for ff in wound_images_B.image_fnames] + \
              [ff.split("_")[0].strip().lower() for ff in wound_images_A.image_fnames]
     for i, l in enumerate(labels):
-        if l in fixed_error_labels:
-            labels[i] = fixed_error_labels[l]
+        if l in C.labels.fixed_error_labels:
+            labels[i] = C.labels.fixed_error_labels[l]
     original_paths = [os.path.join(wound_images_B.images_dir, f) for f in wound_images_B.image_fnames] \
                      + [os.path.join(wound_images_A.images_dir, f) for f in wound_images_A.image_fnames]
     newpaths = len(original_paths) *['']

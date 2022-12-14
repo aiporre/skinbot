@@ -1,58 +1,33 @@
 import numpy as np
 import torch
 from torchvision import transforms
+from skinbot.config import Config
 
-target_str_to_num = {
-    'contact' :  0,
-    'vasculitis' :  1,
-    'necrosis' :  2,
-    'malignant' :  3,
-    'pyoderma': 4, 
-    'infection' :  5,
-    'bland' : 6
-}
-
-
-target_weights = {
-    'contact' :  0.08,
-    'vasculitis' :  0.05,
-    'necrosis' :  0.05,
-    'malignant' :  0.23,
-    'pyoderma': 0.07,
-    'infection' :  0.20,
-    'bland' : 0.29
-}
-
-fixed_error_labels = {
-    'vaskulitis': 'vasculitis',
-    'dermatitis': 'contact',
-}
-
-num_classes = len(target_str_to_num)
+C = Config()
 
 class TargetOneHot:
     def __init__(self):
-        self.target_set_num = len(target_str_to_num)
+        self.target_set_num = len(C.labels.target_str_to_num)
     def __call__(self, x):
         x = x.strip().lower()
         # string is fixed if it is in the fixed_error_labels dictionary
-        if x in fixed_error_labels:
-            x = fixed_error_labels[x]
+        if x in C.labels.fixed_error_labels:
+            x = C.labels.fixed_error_labels[x]
         x_transform = np.zeros(self.target_set_num)
-        x_transform[target_str_to_num[x]] = 1.
+        x_transform[C.labels.target_str_to_num[x]] = 1.
         return x_transform
 
 class TargetValue:
     def __call__(self, x):
         x = x.strip().lower()
         # string is fixed if it is in the fixed_error_labels dictionary
-        if x in fixed_error_labels:
-            x = fixed_error_labels[x]
-        return target_str_to_num[x]
+        if x in C.labels.fixed_error_labels:
+            x = C.labels.fixed_error_labels[x]
+        return C.labels.target_str_to_num[x]
 
 class FuzzyTargetValue:
     def __call__(self, x):
-        values = np.array( [x[k] for k in target_str_to_num.keys()])
+        values = np.array([x[k] for k in C.labels.target_str_to_num.keys()])
         values = values / 100  # np.max(values)
         return values
 

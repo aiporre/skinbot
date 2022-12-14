@@ -11,8 +11,11 @@ from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage
 from torch import distributed as dist
 
 from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
-from skinbot.transformers import num_classes, target_weights
+# from skinbot.transformers import num_classes, target_weights
 from skinbot.utils import validate_target_mode, get_log_path
+from skinbot.config import Config
+
+C = Config()
 
 
 def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration=False):
@@ -147,8 +150,8 @@ def create_classification_trainer(model, optimizer, target_mode, device=None):
     # make loss according to target mode
     if 'single' in target_mode.lower():
         # compute inverse of class weights
-        v_max = max(target_weights.values())
-        target_values_norm = [v_max / v for v in target_weights.values()]
+        v_max = max(C.labels.target_weights.values())
+        target_values_norm = [v_max / v for v in C.labels.target_weights.values()]
         target_weights_tensor = torch.tensor(target_values_norm, dtype=torch.float32, device=device)
         criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
     elif 'multiple' in target_mode.lower():
@@ -168,7 +171,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         y_pred, y = output
         y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred, dim=1)
-        y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
+        y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=C.labels.num_classes)
         # TODO: fix evaluation broken
         if validate_target_mode(target_mode, ['fuzzy', 'multiple']):
             y_argmax = torch.argmax(y, dim=1)
@@ -176,7 +179,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
             y_argmax = y.long()
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
-        y_onehot= torch.nn.functional.one_hot(y_argmax, num_classes=num_classes)
+        y_onehot= torch.nn.functional.one_hot(y_argmax, num_classes=C.labels.num_classes)
         return y_pred_onehot, y_onehot
 
     def pred_in_onehot(output):
@@ -184,7 +187,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         y_pred, y = output
         y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred, dim=1)
-        y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=num_classes)
+        y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=C.labels.num_classes)
 
         if target_mode in ['fuzzy', 'multiple']:
             y_argmax = torch.argmax(y, dim=1)
@@ -197,7 +200,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
     val_metrics = {
         "accuracy": Accuracy(output_transform=pred_in_prob, is_multilabel=True),
         "nll": Loss(criterion),
-        "cm": ConfusionMatrix(num_classes=num_classes, output_transform=pred_in_onehot),
+        "cm": ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot),
         'cosine': Loss(CosineLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
         'euclidean': Loss(EuclideanLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
     }
