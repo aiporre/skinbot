@@ -241,7 +241,7 @@ class WoundImages(Dataset):
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path)/255.0
+            image = read_image(image_path)
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
