@@ -72,6 +72,8 @@ class Pretrained:
             'train': transforms.Compose([
                     transforms.RandomResizedCrop(input_size),
                     transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.RandomRotation(90),
                     #transforms.ToTensor(),
                     ToFloat(),
                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
