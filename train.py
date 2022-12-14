@@ -149,7 +149,7 @@ if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
-    main(target_mode='single', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='resnet50',)
+    main(target_mode='cropSingle', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='resnet50',)
     # main(target_mode='detectionSingle', model_name='faster_rcnn_resnet50_fpn', patience=15, epochs=100, fold=0)
     # main(target_mode='multiple', patience=15, epochs=100, fold=0)
     model_path = None

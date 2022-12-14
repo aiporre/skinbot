@@ -79,3 +79,9 @@ class Config(metaclass=SingletonMeta):
     def is_config(self):
         return self.config is not None
 
+    def label_setting(self) -> str:
+        if self.config is not None:
+            return str(self.config['DATASET']['labels'])
+        else:
+            raise Exception('Config not initialized.')
+

@@ -71,8 +71,7 @@ def fix_target(labels):
     return labels_fixed
 
 
-def crop_lesion(img, label):
-    boxes = label['boxes'][label['labels'] == LESION_LABEL_ID]
+def crop_lesion(img, boxes):
     if len(boxes) == 0:
         return img
     xmin, ymin, xmax, ymax = min(boxes[:, 0]), min(boxes[:, 1]), max(boxes[:, 2]), max(boxes[:, 3])
@@ -123,6 +122,7 @@ class WoundImages(Dataset):
 
         self.create_detection = detection
         self.crop_lesion = crop_lesion
+        self._crop_boxes = {}
 
     def __fix_missing_files(self):
         # Maintains list of files valid
@@ -258,8 +258,13 @@ class WoundImages(Dataset):
             label = self.__make_one_detection_label(label, index)
         if self.crop_lesion:
             # It uses the detection label if it was created before, otherwise it creates a new one
-            _label = label if self.create_detection else self.__make_one_detection_label({'image_label': label}, index)
-            image = crop_lesion(image, _label)
+            if not self.image_fnames[index] in self._crop_boxes:
+                _label = label if self.create_detection else self.__make_one_detection_label({'image_label': label}, index)
+                boxes = _label['boxes'][_label['labels'] == LESION_LABEL_ID]
+                self._crop_boxes[self.image_fnames[index]] = boxes
+            else:
+                boxes = self._crop_boxes[self.image_fnames[index]]
+            image = crop_lesion(image, boxes)
         if self.transform:
             image = self.transform(image)
         if self.target_transform:

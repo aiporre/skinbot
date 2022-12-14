@@ -19,7 +19,7 @@ C = Config()
 
 
 def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration=False):
-    prefix = f"last_fold={fold}_{model_name}_{target_mode}_checkpoint"
+    prefix = f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}_checkpoint"
     if by_iteration:
         iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
         iterations = [int(ii) for ii in iterations if ii.isnumeric()]
@@ -37,7 +37,7 @@ def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration
         return checkpoints[-1]
 
 def get_best_iteration(path_models, fold, model_name, target_mode):
-    prefix = f"best_fold={fold}_{model_name}_{target_mode}_model"
+    prefix = f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}_model"
     iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
     if len(iterations) == 0:
         return None
@@ -48,7 +48,7 @@ def get_best_iteration(path_models, fold, model_name, target_mode):
     return best_model_path
 
 def keep_best_two(path_models, fold, model_name, target_mode):
-    prefix = f"best_fold={fold}_{model_name}_{target_mode}_model"
+    prefix = f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}_model"
     iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
     if len(iterations) < 2:
         return
@@ -278,7 +278,7 @@ def configure_engines(model,
         to_save,
         save_handler=DiskSaver('models', create_dir=True, require_empty=False),
         n_saved=2,
-        filename_prefix=f'last_fold={fold}_{model_name}_{target_mode}',
+        filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
     )
     if best_or_last == 'last':
         last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
@@ -307,7 +307,7 @@ def configure_engines(model,
         to_save,
         save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
         n_saved=2,
-        filename_prefix=f'best_fold={fold}_{model_name}_{target_mode}',
+        filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
         score_name="accuracy",
         global_step_transform=global_step_from_engine(trainer)
     )
