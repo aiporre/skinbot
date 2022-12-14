@@ -15,8 +15,12 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.io import read_image
-from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, target_str_to_num, FuzzyTargetValue, \
+from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
     DetectionTarget, DetectionPretrained
+
+from skinbot.config import Config
+
+C = Config()
 
 # TODO: move to a config file
 LESION_LABEL_ID = 1
@@ -60,7 +64,7 @@ def fix_target(labels):
         # changes names to the ones corrected in the dictionary target_fix_names
         fuzzy_labels_fixed = {target_fix_names[k]: v for k, v in fuzzy_labels.items()}
         # setting zero to all the labels that are not present
-        for k in target_str_to_num.keys():
+        for k in C.labels.target_str_to_num.keys():
             if k not in fuzzy_labels_fixed:
                 fuzzy_labels_fixed[k] = 0
         labels_fixed[fname] = fuzzy_labels_fixed

@@ -59,6 +59,10 @@ def main(best_or_last='best',
         device = torch.device('cpu')
     # prepare dataset
     assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy'])
+    if 'multiple' in target_mode.lower() or 'fuzzy' in target_mode.lower():
+        assert config['DATASET']['labels'] == 'all', \
+            'Target mode Multiple and fuzzy not compatible with labels in $s, ' \
+            'use config[dataset][labels] = all' % {config_file}
     _fold = fold if not external_data else None
     test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=_fold, target=target_mode)
     train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=_fold, target=target_mode)
