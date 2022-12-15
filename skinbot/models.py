@@ -90,6 +90,42 @@ def classification_model(model_name, num_outputs, freeze='No', pretrained=True):
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
         backbone.fc = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+    elif model_name == 'resnet18':
+        weights = models.ResNet18_Weights.DEFAULT  # if pretrained else None
+        T = weights.transforms()
+        backbone = models.resnet18(weights=weights)
+        if freeze == 'yes':
+            freeze_model(backbone)
+        elif freeze != 'no':
+            freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
+        num_features = backbone.fc.in_features
+        backbone.fc = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+    elif model_name == 'vgg19':
+        weights = models.VGG19_Weights.DEFAULT  # if pretrained else None
+        T = weights.transforms()
+        backbone = models.vgg19(weights=weights)
+        if freeze == 'yes':
+            freeze_model(backbone)
+        elif freeze != 'no':
+            freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
+        num_features = 512 * 7 * 7  # backbone.classifier.in_features
+        backbone.classifier = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+    elif model_name == 'vgg16':
+        weights = models.VGG16_Weights.DEFAULT  # if pretrained else None
+        T = weights.transforms()
+        backbone = models.vgg16(weights=weights)
+        if freeze == 'yes':
+            freeze_model(backbone)
+        elif freeze != 'no':
+            freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
+        num_features = 512 * 7 * 7  # backbone.classifier.in_features
+        backbone.classifier = get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
     elif model_name.lower() == 'smallcnn':
         backbone = SmallCNN(num_classes=num_outputs)
     else:
@@ -107,7 +143,7 @@ def detection_model(model_name, num_classes, pretrained=True):
 
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
     model_name = model_name.lower()
-    if model_name.startswith('resnet') or model_name == 'smallcnn':
+    if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
         model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze)
     elif model_name == 'faster_rcnn_resnet50_fpn':
         model = detection_model(model_name, C.labels.num_classes)
