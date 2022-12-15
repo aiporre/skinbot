@@ -189,7 +189,8 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         y_pred_class = torch.argmax(y_pred, dim=1)
         y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=C.labels.num_classes)
 
-        if target_mode in ['fuzzy', 'multiple']:
+        if 'fuzzy' in target_mode.lower() or 'multiple' in target_mode.lower():
+            #  target_mode in ['fuzzy', 'multiple']:
             y_argmax = torch.argmax(y, dim=1)
         elif 'single' in target_mode.lower():
             y_argmax = y.long()

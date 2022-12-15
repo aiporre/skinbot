@@ -328,7 +328,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
     assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple',
                       'detectionOnehot', 'detectionSingle', 'detectionString',
-                      'cropOnehot', 'cropSingle', 'cropString'], \
+                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString'], \
         "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
@@ -362,6 +362,10 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     elif target == 'fuzzy' or target == 'multiple':
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
+    elif target.lower() == 'cropfuzzy' or target.lower() == 'cropmultiple':
+        fuzzy_labels = True
+        target_transform = FuzzyTargetValue()
+        _crop_lesion = True
     else:
         raise ValueError(f"Invalid target {target}")
 

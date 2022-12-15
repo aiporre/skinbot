@@ -60,9 +60,7 @@ def main(best_or_last='best',
     # prepare dataset
     assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy'])
     if 'multiple' in target_mode.lower() or 'fuzzy' in target_mode.lower():
-        assert config['DATASET']['labels'] == 'all', \
-            'Target mode Multiple and fuzzy not compatible with labels in $s, ' \
-            'use config[dataset][labels] = all' % {config_file}
+        assert config['DATASET']['labels'] == 'all', f'Target mode Multiple and fuzzy not compatible with labels in {config_file} use config[dataset][labels] = all'
     _fold = fold if not external_data else None
     test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=_fold, target=target_mode)
     train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=_fold, target=target_mode)
@@ -149,7 +147,7 @@ if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
-    main(target_mode='cropSingle', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='resnet50',)
+    main(target_mode='cropSingle', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='resnet50', only_eval=True)
     # main(target_mode='detectionSingle', model_name='faster_rcnn_resnet50_fpn', patience=15, epochs=100, fold=0)
     # main(target_mode='multiple', patience=15, epochs=100, fold=0)
     model_path = None
