@@ -134,7 +134,8 @@ def classification_model(model_name, num_outputs, freeze='No', pretrained=True):
 
 def detection_model(model_name, num_classes, pretrained=True):
     # load an object detection model pre-trained on COCO
-    model = models.detection.fasterrcnn_resnet50_fpn(pretrained=pretrained)
+    weights = models.detection.FasterRCNN_ResNet50_FPN_Weights.DEFAULT
+    model = models.detection.fasterrcnn_resnet50_fpn(weights=weights)
     # get number of input features for the classifier
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     # replace the pre-trained head with a new one
