@@ -1,9 +1,10 @@
+import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import torch
 
-def prediction_all_samples(model, dataloader, fold, target_mode):
+def predict_samples(model, dataloader, fold, target_mode, N=None):
     model.eval()
     labels = []
     predictions = []
@@ -15,7 +16,7 @@ def prediction_all_samples(model, dataloader, fold, target_mode):
             inputs, label = batch
             outputs = model(inputs)
             prob = torch.softmax(outputs, dim=1)
-            _, predicted = torch.max(outputs, 1)
+            _, predicted = torch.max(outputs, dim=1)
             predictions.extend(predicted.tolist())
             # if fuzzy we need to compute the index as the max value
             if is_fuzzy:
@@ -23,6 +24,11 @@ def prediction_all_samples(model, dataloader, fold, target_mode):
                 label = torch.argmax(label, dim=1) if len(label.shape) > 1 else label
             labels.extend(label.tolist())
             probs.extend(prob.tolist())
+            cnt = len(labels)
+            if N is not None:
+                logging.info('pred: ', cnt, 'out of ', N)
+                if cnt > N:
+                    break
     if is_fuzzy:
         return pd.DataFrame( {"y_pred": predictions, "y_true": labels, "y_prob": probs, "y_true_fuzzy": labels_fuzzy,
                               'files': dataloader.dataset.image_fnames,

@@ -8,6 +8,7 @@ from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, create_supervised_trainer, create_supervised_evaluator, Events
 from ignite.handlers import Checkpoint, DiskSaver, EarlyStopping, global_step_from_engine
 from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage
+from ignite.engine import EventEnum
 from torch import distributed as dist
 
 from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
@@ -16,6 +17,14 @@ from skinbot.utils import validate_target_mode, get_log_path
 from skinbot.config import Config
 
 C = Config()
+
+
+class CheckpointEvents(EventEnum):
+    """
+    Custom events defined by user
+    """
+    SAVE_BEST = 'save_best'
+    SAVE_LAST = 'save_last'
 
 
 def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration=False):
@@ -131,7 +140,8 @@ def create_detection_evaluator(model, device=None):
         x, y = prepare_batch(batch, device=device)
         x_process = copy.deepcopy(x)
 
-        torch.cuda.synchronize()
+        if torch.has_cuda:
+            torch.cuda.synchronize()
         with torch.no_grad():
             y_pred = model(x_process)
 
@@ -185,7 +195,6 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
     def pred_in_onehot(output):
         ''' convert prediction to one-hot vector  and taget into single label '''
         y_pred, y = output
-        y_pred_prob = torch.softmax(y_pred, dim=1)
         y_pred_class = torch.argmax(y_pred, dim=1)
         y_pred_onehot = torch.nn.functional.one_hot(y_pred_class, num_classes=C.labels.num_classes)
 
@@ -199,7 +208,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         return y_pred_onehot, y_argmax
 
     val_metrics = {
-        "accuracy": Accuracy(output_transform=pred_in_prob, is_multilabel=True),
+        "accuracy": Accuracy(),
         "nll": Loss(criterion),
         "cm": ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot),
         'cosine': Loss(CosineLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
@@ -257,7 +266,7 @@ def configure_engines(model,
             f"Avg Euclidean: {metrics['euclidean']:.2f}")
 
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    @trainer.on(Events.EPOCH_COMPLETED(every=2))
     def log_validation_results(engine):
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
@@ -272,6 +281,7 @@ def configure_engines(model,
             f"Avg Euclidean: {metrics['euclidean']:.2f}")
 
         pbar.n = pbar.last_print_n = 0
+        evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 
 
     to_save = {"weights": model, "optimizer": optimizer}
@@ -310,7 +320,7 @@ def configure_engines(model,
         n_saved=2,
         filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
         score_name="accuracy",
-        global_step_transform=global_step_from_engine(trainer)
+        # global_step_transform=global_step_from_engine(trainer)
     )
 
     if best_or_last == 'best':
@@ -327,10 +337,13 @@ def configure_engines(model,
         if best_model_path is not None:
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
+            model.load_state_dict(torch.load(best_model_path))
+            to_save['model'] = model
             logging.info(f'Loaded best model {best_model_path}')
             handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
         else:
             logging.info(f'No best model found. starting from scratch')
+    evaluator.register_events(*CheckpointEvents)
+    evaluator.add_event_handler(CheckpointEvents.SAVE_BEST, handler_best)
 
-    evaluator.add_event_handler(Events.COMPLETED, handler_best)
     return trainer, evaluator

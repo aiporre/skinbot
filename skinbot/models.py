@@ -151,7 +151,7 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
     else:
         raise Exception(f"Model name {model_name} is not defined.")
     if optimizer is not None:
-        if freeze:
+        if freeze != 'No':
             model_parameters = []
             for n, p in model.named_parameters():
                 if p.requires_grad:
@@ -161,6 +161,8 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
 
         if optimizer == 'SGD':
             model_optimizer = torch.optim.SGD(model_parameters, lr=lr, momentum=momentum)
+        elif optimizer == 'ADAM':
+            model_optimizer = torch.optim.Adam(model_parameters, lr=lr, betas=(0.9, 0.999), eps=1e-08)
         else:
             raise Exception(f"optimizer name {optimizer} not defined")
         return model, model_optimizer

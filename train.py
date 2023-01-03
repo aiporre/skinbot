@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 
 import pandas as pd
 import torch
@@ -10,8 +11,8 @@ from sklearn.metrics import classification_report, ConfusionMatrixDisplay, confu
 from skinbot.dataset import get_dataloaders
 from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
-    create_classification_evaluator, create_detection_evaluator
-from skinbot.evaluations import prediction_all_samples, error_analysis
+    create_classification_evaluator, create_detection_evaluator, get_best_iteration
+from skinbot.evaluations import predict_samples, error_analysis
 from skinbot.models import get_model
 # from skinbot.transformers import num_classes, target_str_to_num
 
@@ -62,8 +63,8 @@ def main(best_or_last='best',
     if 'multiple' in target_mode.lower() or 'fuzzy' in target_mode.lower():
         assert config['DATASET']['labels'] == 'all', f'Target mode Multiple and fuzzy not compatible with labels in {config_file} use config[dataset][labels] = all'
     _fold = fold if not external_data else None
-    test_dataloader = get_dataloaders(config, batch=16, mode='test', fold_iteration=_fold, target=target_mode)
-    train_dataloader = get_dataloaders(config, batch=16, mode='train', fold_iteration=_fold, target=target_mode)
+    test_dataloader = get_dataloaders(config, batch=batch_size, mode='test', fold_iteration=_fold, target=target_mode)
+    train_dataloader = get_dataloaders(config, batch=batch_size, mode='train', fold_iteration=_fold, target=target_mode)
 
     # prepare models
     model, optimizer = get_model(model_name, optimizer='SGD', lr=LR, momentum=momentum, freeze=freeze)
@@ -87,25 +88,27 @@ def main(best_or_last='best',
     if not only_eval:
         trainer.run(train_dataloader, max_epochs=EPOCHS)
     else:
-        logging.info('dataset statistics')
-        all_dataloader = get_dataloaders(config, batch=16, mode='all')
-        all_labels = []
-        # collect all labels in a list
-        if os.path.exists('./dataset_statistics.csv'):
-            df_all = pd.read_csv('./dataset_statistics.csv')
-        else:
-            for x, y in all_dataloader:
-                all_labels.extend(y.tolist())
-            df_all = pd.DataFrame(all_labels, columns=['label'])
-            target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
-            df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
-            # save the dataset statistics
-            df_all.to_csv('./dataset_statistics.csv', index=False)
-        # sns.set(style="darkgrid")
-        ax = sns.countplot(x="label_name", data=df_all)
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
-        ax.set_ylabel('Number of instances')
-        plt.show()
+        random.seed(0)
+        # logging.info('dataset statistics')
+        # all_dataloader = get_dataloaders(config, batch=16, mode='all')
+        # all_labels = []
+        # # collect all labels in a list
+        # if os.path.exists('./dataset_statistics.csv'):
+        #     df_all = pd.read_csv('./dataset_statistics.csv')
+        # else:
+        #     for x, y in all_dataloader:
+        #         all_labels.extend(y.tolist())
+        #     df_all = pd.DataFrame(all_labels, columns=['label'])
+        #     target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
+        #     df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
+        #     # save the dataset statistics
+        #     df_all.to_csv('./dataset_statistics.csv', index=False)
+        # # sns.set(style="darkgrid")
+        # ax = sns.countplot(x="label_name", data=df_all)
+        # ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
+        # ax.set_ylabel('Number of instances')
+
+        # plt.show()
         logging.info('Running evaluations Train and test (in that order).')
         evaluator.run(train_dataloader)
         logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
@@ -114,15 +117,30 @@ def main(best_or_last='best',
         _fold = fold if not external_data else 'external'
         predictions_fname = f'./predictions_fold={_fold}_{model_name}_{target_mode}.csv'
 
-        if os.path.exists(predictions_fname):
+        if False:  # os.path.exists(predictions_fname):
             df = pd.read_csv(predictions_fname)
         else:
-            df = prediction_all_samples(model, test_dataloader, fold, target_mode)
+            # best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+            # best_model_path = os.path.join('best_models', best_model_path)
+            # model.load_state_dict(torch.load(best_model_path))
+            if model_path is not None:
+                model.load_state_dict(torch.load(model_path))
+                logging.info('model loaded: ', model_path)
+            else:
+                best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+                if best_model_path is not None:
+                    best_model_path = os.path.join('best_models', best_model_path)
+                    model.load_state_dict(torch.load(best_model_path))
+                    logging.info('best model loaded: ', model_path)
+            df = predict_samples(model, test_dataloader, fold, target_mode)
             df.to_csv(predictions_fname, index=False)
         logging.info(df.head())
         logging.info('prediction_results.csv saved')
         df = error_analysis(df)
-        logging.info(f"prediction summary: {df['error'].describe()}")
+        # logging.info(f"prediction summary: {df['error'].describe()}")
+        accTotal = float(len(df)-df['error'].sum())/len(df)
+        logging.info(f' Prediction acc: {accTotal}')
+
         class_names = list(C.labels.target_str_to_num.keys())
         report = classification_report(df['y_true'], df['y_pred'], labels=range(len(class_names)),
                                        target_names=class_names)
@@ -140,6 +158,7 @@ def main(best_or_last='best',
         disp.plot(xticks_rotation='vertical')
         plt.tight_layout()
         plt.show()
+        return accTotal
 
 
 if __name__ == "__main__":
@@ -147,7 +166,32 @@ if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
-    main(target_mode='cropSingle', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='vgg19', only_eval=True)
+    # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
+    main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
+    # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"
+    # PATH = "/media/doom/GG2/skin-project/models_3/best_models"
+    # PATH = "/home/doom/Documents/Phd/code/skinbot/best_models"
+    # files = os.listdir(PATH)
+    # accuracies = {f: 0 for f in files}
+    # for f in files: #os.listdir(PATH):
+    #     print(' ======================================== ')
+    #     print(f)
+    #     fold = int(f[f.index('fold=')+5])
+    #     ff = os.path.join(PATH, f)
+    #     try:
+    #         acc = main(target_mode='cropSingle',  epochs=100, fold=fold, batch_size=32, lr=0.001,
+    #              model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=ff)
+    #         accuracies[f] = acc
+    #     except Exception as e:
+    #         # logging.error(f'ERROR: {e}')
+    #         print(f'cannot run fiel: {ff}')
+    #         print(e)
+    # data = {'accuracies': list(accuracies.values()), 'files': list(accuracies.keys())}
+    # accuracies = pd.DataFrame(data=data)
+    # accuracies.to_csv('accuracies.csv')
+
+    # main(target_mode='cropSingle', patience=15, epochs=100, fold=0, config_file='config.ini', model_name='vgg19', only_eval=True)
     # main(target_mode='detectionSingle', model_name='faster_rcnn_resnet50_fpn', patience=15, epochs=100, fold=0)
     # main(target_mode='multiple', patience=15, epochs=100, fold=0)
     model_path = None
@@ -164,3 +208,4 @@ if __name__ == "__main__":
     # if model_path is not None:
     #     model.load_state_dict(torch.load(model_path)['model'])
     #     logging.info('loaded model', model_path)
+

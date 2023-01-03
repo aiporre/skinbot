@@ -1,5 +1,5 @@
 import configparser
-
+from threading import Lock
 from skinbot.singleton import SingletonMeta
 
 
@@ -57,6 +57,24 @@ class LabelConstantsInfection:
     num_classes = len(target_str_to_num)
 
 
+
+class LabelConstantsDemo:
+    target_str_to_num = {
+        'blue': 0,
+        'red': 1
+    }
+
+    target_weights = {
+        'blue': 0.5,
+        'infection': 0.5,
+    }
+
+    fixed_error_labels = {
+        'dummy': 'blue'
+    }
+
+    num_classes = len(target_str_to_num)
+
 def read_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config.read(config_file)
@@ -67,12 +85,18 @@ class Config(metaclass=SingletonMeta):
     config = None
     labels = None
 
+    _instances = {}
+
+    _lock: Lock = Lock()
+
     def set_config(self, config):
         self.config = config
         if config['DATASET']['labels'].lower() == 'all':
             self.labels = LabelConstantsAll
         elif config['DATASET']['labels'].lower() == 'infection':
             self.labels = LabelConstantsInfection
+        elif config['DATASET']['labels'].lower() == 'demo':
+            self.labels = LabelConstantsDemo
         else:
             raise Exception('Dataset configuration not found.')
 
