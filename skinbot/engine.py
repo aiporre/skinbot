@@ -119,18 +119,20 @@ def create_detection_trainer(model, optimizer, device=None):
         # if the loss is infinite, the use have to know about it
         if not math.isfinite(loss_value):
             logging.info("Loss is {}, resetting loss and skipping training iteration".format(loss_value))
-            logging.info('Loss values were: %f ' % loss_dict_reduced)
+            logging.info(f'Loss values were: %f {loss_dict_reduced}.')
             logging.info(f"Input labels were:  {[yy['labels'] for yy in y]}")
             logging.info(f"Input boxes were: ', {[yy['boxes'] for yy in y]}")
             loss_dict_reduced = {k: torch.tensor(0) for k, v in loss_dict_reduced.items()}
+            loss_value = 0
         else:
             loss_sum.backward()
             engine.state.optimizer.step()
 
-        if engine.state.warmup_scheduler is not None:
+        if hasattr(engine.state,'warmup_scheduler') and engine.state.warmup_scheduler is not None:
             engine.state.warmup_scheduler.step()
 
-        return x, y, loss_dict_reduced
+        # return x, y, loss_dict_reduced
+        return loss_value
     engine = Engine(update_model)
     engine.state.optimizer = optimizer
     return engine
@@ -244,7 +246,7 @@ def configure_engines(model,
         pbar = ProgressBar(persist=True, file=log_file_handler)
     else:
         pbar = ProgressBar(persist=True)
-    pbar.attach(trainer, metric_names="all")
+    # pbar.attach(trainer, metric_names="all")
 
 
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))

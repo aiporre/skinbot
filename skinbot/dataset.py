@@ -144,6 +144,22 @@ class WoundImages(Dataset):
                 logging.info('removing aux_files')
                 self.image_fnames.remove(f)
                 continue
+    def clear_missing_boxes(self):
+        files_to_remove = []
+        logging.info('Removing detection without boxes...')
+        for index in range(len(self.image_fnames)):
+            label = {}
+            label = self.__make_one_detection_label(label, index)
+            f = self.image_fnames[index]
+            if len(label['boxes']) == 0:
+                files_to_remove.append(f)
+            if index % 50 == 0:
+                logging.info(f'finding ... {index}/{len(self.image_fnames)}')
+
+        for f in files_to_remove:
+            logging.info(f'Remove file {f} because it doesn\'t have boxes')
+            self.image_fnames.remove(f)
+
 
     def load_fuzzy_labels(self):
         fname_labels = {}
@@ -395,6 +411,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
         return tuple(zip(*batch))
 
     if 'detection' in target:
+        wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate)
     else:
         dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
