@@ -384,8 +384,30 @@ def configure_engines_detection(target_mode,
 
 
     # configure evaluator coco api wrapper functions
-    val_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(test_dataloader)))
-    coco_api_val_dataset = convert_to_coco_api(val_dataset)
+    test_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(test_dataloader)))
+    coco_api_test_dataset = convert_to_coco_api(test_dataset)
+    train_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(train_dataloader)))
+    coco_api_train_dataset = convert_to_coco_api(train_dataset)
+
+    @evaluator.on(Events.COMPLETED)
+    def on_evaluation_completed(engine):
+        # gather the stats from all processes
+        engine.state.coco_evaluator.synchronize_between_processes()
+
+        # accumulate predictions from all images
+        engine.state.coco_evaluator.accumulate()
+        engine.state.coco_evaluator.summarize()
+        #loading metric values (using hard-code values from coco eval api)
+        # Average precision and average recall sets in this order:
+        # 1. Iou 0.5 to 0.95 (all areas)
+        # 2. Iou 0.5 (all areas)
+        # 3. Iou 0.76 (all areas)
+        # 4. Iou 0.5 to 0.95 (medium areas)
+        # 5. Iou 0.5 to 0.95 (large areas)
+        engine.state.metrics = {}
+        for k, coco_eval in engine.state.coco_evaluator.coco_eval.items():
+            if len(coco_eval.stats) > 0:
+                engine.state.metrics[f'IoU_precision_0.5_{k}'] = coco_eval.stats[1]
 
     def infer_ioutypes_coco_api(_model):
         if isinstance(_model, torchvision.models.detection.FasterRCNN):
@@ -393,10 +415,6 @@ def configure_engines_detection(target_mode,
         elif isinstance(_model, torchvision.models.detection.MaskRCNN):
             ioutypes = ['bbox', 'segm']
         return ioutypes
-    @evaluator.on(Events.STARTED)
-    def on_evaluation_started(engine):
-        model.eval()
-        engine.state.coco_evaluator = CocoEvaluator(coco_api_val_dataset, infer_ioutypes_coco_api(model))
 
     # configure logging progress bar
     loss_keys = get_loss_keys(model, train_dataloader)
@@ -422,6 +440,98 @@ def configure_engines_detection(target_mode,
     else:
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
+
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    def log_training_results(engine):
+        evaluator.state.coco_evaluator = CocoEvaluator(coco_api_train_dataset, infer_ioutypes_coco_api(model))
+        evaluator.run(train_dataloader)
+
+        metrics = evaluator.state.metrics
+        # # print(f"Training Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
+        IoU_precision_0p5_bbox = metrics["IoU_precision_0.5_bbox"]
+        # avg_nll = metrics["nll"]
+        pbar.log_message(
+            f"Training Results - Epoch: {engine.state.epoch} "
+        #     f"Avg accuracy: {avg_accuracy:.2f} "
+        #     f"Avg loss: {avg_nll:.2f} "
+        #     f"Avg Cosine: {metrics['cosine']:.2f}"
+            f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
+
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    def log_validation_results(engine):
+        evaluator.state.coco_evaluator = CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
+        evaluator.run(test_dataloader)
+        metrics = evaluator.state.metrics
+        # # print(f"Training Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
+        IoU_precision_0p5_bbox = metrics["IoU_precision_0.5_bbox"]
+        # avg_nll = metrics["nll"]
+        pbar.log_message(
+            f"Validation Results - Epoch: {engine.state.epoch} "
+            #     f"Avg accuracy: {avg_accuracy:.2f} "
+            #     f"Avg loss: {avg_nll:.2f} "
+            #     f"Avg Cosine: {metrics['cosine']:.2f}"
+            f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
+        evaluator.fire_event(CheckpointEvents.SAVE_BEST)
+
+    to_save = {"weights": model, "optimizer": optimizer}
+    handler_ckpt = Checkpoint(
+        to_save,
+        save_handler=DiskSaver('models', create_dir=True, require_empty=False),
+        n_saved=2,
+        filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
+    )
+    if best_or_last == 'last':
+        last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        if last_checkpoint_path is not None:
+            last_checkpoint_path = os.path.join('models', last_checkpoint_path)
+            to_load = to_save
+            handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+            logging.info(f'loaded last checkpoint {last_checkpoint_path}')
+
+    trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
+
+    ## early stopping
+    def score_function(engine):
+        val_loss = engine.state.metrics['loss']
+        return -val_loss
+
+    if patience is not None:
+        early_stop_handler = EarlyStopping(patience=patience, score_function=score_function, trainer=trainer)
+        trainer.add_event_handler(Events.EPOCH_COMPLETED, early_stop_handler)
+
+    to_save = {'model': model}
+    handler_best = Checkpoint(
+        to_save,
+        save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
+        n_saved=2,
+        filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
+        score_name="IoU_precision_0.5_bbox",
+        # global_step_transform=global_step_from_engine(trainer)
+    )
+
+    if best_or_last == 'best':
+        # get the best model path
+        if model_path is not None:
+            best_model_path = model_path
+        else:
+            # keeps the best_models directory clean
+            keep_best_two('best_models', fold, model_name, target_mode)
+            # get the best model path
+            best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+
+        # if success then load the best model
+        if best_model_path is not None:
+            best_model_path = os.path.join('best_models', best_model_path)
+            to_load = to_save
+            model.load_state_dict(torch.load(best_model_path))
+            to_save['model'] = model
+            logging.info(f'Loaded best model {best_model_path}')
+            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+        else:
+            logging.info(f'No best model found. starting from scratch')
+
+    evaluator.register_events(*CheckpointEvents)
+    evaluator.add_event_handler(CheckpointEvents.SAVE_BEST, handler_best)
 
     return trainer, evaluator
 
