@@ -80,7 +80,6 @@ def prepare_batch(batch, device=None):
     y = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in y]
     return x, y
 
-
 def reduce_dict(loss_dict):
     if dist.is_available() and dist.is_initialized():
         world_size = dist.get_world_size()
@@ -103,6 +102,16 @@ def reduce_dict(loss_dict):
         reduced_losses = {k: v for k, v in zip(names, values)}
     return reduced_losses
 
+def get_loss_keys(model, dataloader):
+    batch = next(iter(dataloader))
+    x, y = prepare_batch(batch)
+    model.train()
+    loss_dict = model(x, y)
+    loss_dict_reduced = reduce_dict(loss_dict)
+    return list(loss_dict_reduced.keys())
+
+        
+        
 
 def create_detection_trainer(model, optimizer, device=None):
     def update_model(engine, batch):
@@ -136,8 +145,8 @@ def create_detection_trainer(model, optimizer, device=None):
         if hasattr(engine.state,'warmup_scheduler') and engine.state.warmup_scheduler is not None:
             engine.state.warmup_scheduler.step()
 
-        # return x, y, loss_dict_reduced
-        return loss_value
+        return x, y, loss_dict_reduced
+
     engine = Engine(update_model)
     engine.state.optimizer = optimizer
     return engine
@@ -373,6 +382,8 @@ def configure_engines_detection(target_mode,
                       model_path):
     from itertools import chain
 
+
+    # configure evaluator coco api wrapper functions
     val_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(test_dataloader)))
     coco_api_val_dataset = convert_to_coco_api(val_dataset)
 
@@ -386,6 +397,31 @@ def configure_engines_detection(target_mode,
     def on_evaluation_started(engine):
         model.eval()
         engine.state.coco_evaluator = CocoEvaluator(coco_api_val_dataset, infer_ioutypes_coco_api(model))
+
+    # configure logging progress bar
+    loss_keys = get_loss_keys(model, train_dataloader)
+    class RATrans:
+        def __init__(self, k):
+            self.k = k
+        def __call__(self,output):
+            x, y, loss = output
+            return loss[self.k].item()
+
+    for k in loss_keys:
+        RunningAverage(output_transform=RATrans(k)).attach(trainer, k)
+    RunningAverage(output_transform=lambda output: sum(loss for loss in output[2].values()).item()).attach(trainer, "loss_sum")
+
+    if display_info and torch.cuda.is_available():
+        from ignite.contrib.metrics import GpuInfo
+        GpuInfo().attach(trainer, name='gpu')
+
+    if config['LOGGER']['logtofile'] == 'True':
+        log_path = get_log_path(config)
+        log_file_handler = open(log_path, 'w')
+        pbar = ProgressBar(persist=True, file=log_file_handler)
+    else:
+        pbar = ProgressBar(persist=True)
+    pbar.attach(trainer, metric_names="all")
 
     return trainer, evaluator
 
