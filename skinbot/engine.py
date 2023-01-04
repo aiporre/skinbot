@@ -4,6 +4,7 @@ import math
 import os
 
 import torch
+import torchvision.models.detection
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, create_supervised_trainer, create_supervised_evaluator, Events
 from ignite.handlers import Checkpoint, DiskSaver, EarlyStopping, global_step_from_engine
@@ -15,6 +16,10 @@ from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
 # from skinbot.transformers import num_classes, target_weights
 from skinbot.utils import validate_target_mode, get_log_path
 from skinbot.config import Config
+
+
+from skinbot.torchvisionrefs.coco_eval import CocoEvaluator
+from skinbot.torchvisionrefs.coco_utils import convert_to_coco_api
 
 C = Config()
 
@@ -139,6 +144,7 @@ def create_detection_trainer(model, optimizer, device=None):
 
 def create_detection_evaluator(model, device=None):
     def update_model(engine, batch):
+        model.eval()
         x, y = prepare_batch(batch, device=device)
         x_process = copy.deepcopy(x)
 
@@ -220,7 +226,8 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
     evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
     return evaluator
 
-def configure_engines(model,
+def configure_engines_classification(target_mode,
+                      model,
                       optimizer,
                       trainer,
                       evaluator,
@@ -229,7 +236,6 @@ def configure_engines(model,
                       config,
                       display_info,
                       fold,
-                      target_mode,
                       model_name,
                       best_or_last,
                       patience,
@@ -246,7 +252,7 @@ def configure_engines(model,
         pbar = ProgressBar(persist=True, file=log_file_handler)
     else:
         pbar = ProgressBar(persist=True)
-    # pbar.attach(trainer, metric_names="all")
+    pbar.attach(trainer, metric_names="all")
 
 
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
@@ -349,3 +355,43 @@ def configure_engines(model,
     evaluator.add_event_handler(CheckpointEvents.SAVE_BEST, handler_best)
 
     return trainer, evaluator
+
+
+def configure_engines_detection(target_mode,
+                      model,
+                      optimizer,
+                      trainer,
+                      evaluator,
+                      train_dataloader,
+                      test_dataloader,
+                      config,
+                      display_info,
+                      fold,
+                      model_name,
+                      best_or_last,
+                      patience,
+                      model_path):
+    from itertools import chain
+
+    val_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(test_dataloader)))
+    coco_api_val_dataset = convert_to_coco_api(val_dataset)
+
+    def infer_ioutypes_coco_api(_model):
+        if isinstance(_model, torchvision.models.detection.FasterRCNN):
+            ioutypes = ['bbox']
+        elif isinstance(_model, torchvision.models.detection.MaskRCNN):
+            ioutypes = ['bbox', 'segm']
+        return ioutypes
+    @evaluator.on(Events.STARTED)
+    def on_evaluation_started(engine):
+        model.eval()
+        engine.state.coco_evaluator = CocoEvaluator(coco_api_val_dataset, infer_ioutypes_coco_api(model))
+
+    return trainer, evaluator
+
+
+def configure_engines(target_mode, *args, **kwargs):
+    if 'detection' in target_mode:
+        return configure_engines_detection(target_mode, *args, **kwargs)
+    else:
+        return configure_engines_classification(target_mode, *args, **kwargs)

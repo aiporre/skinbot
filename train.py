@@ -83,8 +83,8 @@ def main(best_or_last='best',
         evaluator = create_classification_evaluator(model, criterion, target_mode, device=device)
 
     # configuration of the engines
-    trainer, evaluator = configure_engines( model, optimizer, trainer, evaluator, train_dataloader,
-                                           test_dataloader, config, display_info, fold, target_mode,
+    trainer, evaluator = configure_engines( target_mode, model, optimizer, trainer, evaluator, train_dataloader,
+                                           test_dataloader, config, display_info, fold,
                                            model_name, best_or_last, patience, model_path)
     # ---------------------------
     # Run training
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
-    main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
     # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"
     # PATH = "/media/doom/GG2/skin-project/models_3/best_models"
