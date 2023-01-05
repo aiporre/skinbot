@@ -4,19 +4,10 @@ import os
 import torch
 import torch.utils.data
 import torchvision
-# import transforms as T
 from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
 
-class Compose:
-    # transfroms.py in ref torchvision
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def __call__(self, image, target):
-        for t in self.transforms:
-            image, target = t(image, target)
-        return image, target
+import skinbot.torchvisionrefs.transforms as T
 
 
 class FilterAndRemapCocoCategories:
@@ -242,8 +233,7 @@ def get_coco(root, image_set, transforms, mode="instances"):
 
     if transforms is not None:
         t.append(transforms)
-    # transforms = T.Compose(t)
-    transforms = Compose(t)
+    transforms = T.Compose(t)
 
     img_folder, ann_file = PATHS[image_set]
     img_folder = os.path.join(root, img_folder)
