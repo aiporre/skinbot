@@ -281,8 +281,13 @@ class WoundImages(Dataset):
             else:
                 boxes = self._crop_boxes[self.image_fnames[index]]
             image = crop_lesion(image, boxes)
-        if self.transform:
-            image = self.transform(image)
+        if self.create_detection:
+            # transforms uses two x and y
+            if self.transform:
+                image, target = self.transform(image, label)
+        else:
+            if self.transform and not self.create_detection:
+                image = self.transform(image)
         if self.target_transform:
             label = self.target_transform(label)
         return image, label

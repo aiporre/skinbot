@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torchvision import transforms
+from skinbot.torchvisionrefs import transforms as detection_transforms
 from skinbot.config import Config
 
 C = Config()
@@ -73,11 +74,11 @@ class DetectionPretrained:
         T = []
         T.append(transforms.ConvertImageDtype(torch.float))
         if not test:
-            T.append(transforms.RandomHorizontalFlip(0.5))
-        self.T = transforms.Compose(T)
+            T.append(detection_transforms.RandomHorizontalFlip(0.5))
+        self.T = detection_transforms.Compose(T)
 
-    def __call__(self, x):
-        return self.T(x)
+    def __call__(self, x, y=None):
+        return self.T(x,y)
 
 class DetectionTarget:
     # Applies the transform to the target "image_label" if Target is a "detection" kind of label
