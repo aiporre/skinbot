@@ -427,7 +427,7 @@ def configure_engines_detection(target_mode,
 
     for k in loss_keys:
         RunningAverage(output_transform=RATrans(k)).attach(trainer, k)
-    RunningAverage(output_transform=lambda output: sum(loss for loss in output[2].values()).item()).attach(trainer, "loss_sum")
+    RunningAverage(output_transform=lambda output: sum(loss for loss in output[2].values()).item()).attach(trainer, "loss")
 
     if display_info and torch.cuda.is_available():
         from ignite.contrib.metrics import GpuInfo
