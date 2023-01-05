@@ -72,7 +72,7 @@ class DetectionPretrained:
     def __init__(self, test=False):
         self.test = test
         T = []
-        T.append(transforms.ConvertImageDtype(torch.float))
+        T.append(detection_transforms.ConvertImageDtype(torch.float))
         if not test:
             T.append(detection_transforms.RandomHorizontalFlip(0.5))
         self.T = detection_transforms.Compose(T)

@@ -23,7 +23,7 @@ class Compose:
 
     def __call__(self, image, target):
         for t in self.transforms:
-            image, target = t(image, target)
+            image, target = t(image, target=target)
         return image, target
 
 
