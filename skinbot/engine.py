@@ -226,7 +226,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
     def pred_thresholded(output):
         y_pred, y = output
         print('====> ', y)
-        y_pred = torch.float(y_pred > 0.5)
+        y_pred = (y_pred > 0.5) * 1.0
         print('----->', y_pred)
         return y_pred, y
 

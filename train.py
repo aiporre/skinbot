@@ -12,7 +12,7 @@ from skinbot.dataset import get_dataloaders
 from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator, get_best_iteration
-from skinbot.evaluations import predict_samples, error_analysis
+from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam
 from skinbot.models import get_model
 # from skinbot.transformers import num_classes, target_str_to_num
 
@@ -93,6 +93,11 @@ def main(best_or_last='best',
         trainer.run(train_dataloader, max_epochs=EPOCHS)
     else:
         random.seed(0)
+
+        logging.info("===> Plotting one grad CAM")
+        plot_one_grad_cam(model, dataloader=test_dataloader, target_mode=target_mode)
+
+        return
         # logging.info('dataset statistics')
         # all_dataloader = get_dataloaders(config, batch=16, mode='all')
         # all_labels = []
@@ -170,8 +175,8 @@ if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
-    # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
-    main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
+    # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
     # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"
     # PATH = "/media/doom/GG2/skin-project/models_3/best_models"

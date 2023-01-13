@@ -1,8 +1,56 @@
 import logging
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import torch
+from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from skinbot.dataset import crop_lesion, read_image
+def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, index=0, target_layer="layer4.2.conv3"):
+    """
+    plots one calculation of grad cam on model by fiename or index
+    """
+    dataset = dataloader.dataset
+    if fname is not None:
+        logging.info('Fname overwrites index be aware')
+        index = dataset.image_fnames.index(fname)
+    else:
+        fname = dataset.image_fnames[index]
+    logging.info(f"Plotting gradCAM for image: {fname} at index {index}")
+    # TODO: use variable targe_later +layer3.2.conv3
+    target_layers_objs = [model.layer4[-1]]
+
+    sample = dataset[index]
+    x,y = sample
+    x = torch.unsqueeze(x,0)
+    use_cuda = torch.has_cuda
+    cam = GradCAM(model=model, target_layers=target_layers_objs, use_cuda=use_cuda)
+    targets = [ClassifierOutputTarget(y)]
+
+    # You can also pass aug_smooth=True and eigen_smooth=True, to apply smoothing.
+    grayscale_cam = cam(input_tensor=x, targets=targets)
+
+    # fname_19 = os.path.join(dataset.images_dir, dataset.image_fnames[index])
+    # if "crop" in target_mode:  # crop in target:
+    #     rgb_img = read_image(fname_19).numpy() #.transpose(1, 2, 0)
+    # else:
+    #     rgb_img = read_image(fname_19).numpy()
+    #     cc = dataset._crop_boxes[dataset.image_fnames[index]]
+    #     rgb_img = crop_lesion(rgb_img, cc).transpose(1, 2, 0)
+    # In this example grayscale_cam has only one image in the batch:
+    # rgb_img = rgb_img/255.0
+    rgb_img = (x - x.min())/(x.max()-x.min())
+    rgb_img = rgb_img.numpy().squeeze().transpose(1,2,0)
+    print(rgb_img.shape)
+    # plt.imshow(rgb_img)
+    # plt.show()
+
+    grayscale_cam = grayscale_cam[0, :]
+    visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+    plt.imshow(visualization)
+    plt.show()
 
 def predict_samples(model, dataloader, fold, target_mode, N=None):
     model.eval()
