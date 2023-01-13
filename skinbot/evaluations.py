@@ -46,11 +46,11 @@ def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, inde
     print(rgb_img.shape)
     # plt.imshow(rgb_img)
     # plt.show()
-
+    fig1, ax = plt.subplots()
     grayscale_cam = grayscale_cam[0, :]
     visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
-    plt.imshow(visualization)
-    plt.show()
+    ax.imshow(visualization)
+    return fig1, ax
 
 def predict_samples(model, dataloader, fold, target_mode, N=None):
     model.eval()
