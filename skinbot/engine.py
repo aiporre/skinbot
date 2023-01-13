@@ -223,9 +223,15 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
         return y_pred_onehot, y_argmax
+    def pred_thresholded(output):
+        y_pred, y = output
+        print('====> ', y)
+        y_pred = torch.float(y_pred > 0.5)
+        print('----->', y_pred)
+        return y_pred, y
 
     val_metrics = {
-        "accuracy": Accuracy(),
+        "accuracy": Accuracy() if not validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Accuracy(output_transform=pred_thresholded),
         "nll": Loss(criterion),
         "cm": ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot),
         'cosine': Loss(CosineLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
