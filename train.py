@@ -177,27 +177,28 @@ if __name__ == "__main__":
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
+    main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
     # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"
     # PATH = "/media/doom/GG2/skin-project/models_3/best_models"
     # PATH = "/home/doom/Documents/Phd/code/skinbot/best_models"
-    PATH = "/media/doom/GG2/skin-project/models_4/best_models"
-    files = os.listdir(PATH)
-    accuracies = {f: 0 for f in files}
-    for f in files: #os.listdir(PATH):
-        print(' ======================================== ')
-        print(f)
-        fold = int(f[f.index('fold=')+5])
-        ff = os.path.join(PATH, f)
-        try:
-            acc = main(target_mode='cropSingle',  epochs=100, fold=fold, batch_size=32, lr=0.001,
-                 model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=ff)
-            accuracies[f] = acc
-        except Exception as e:
-            # logging.error(f'ERROR: {e}')
-            print(f'cannot run fiel: {ff}')
-            print(e)
+    # PATH = "/media/doom/GG2/skin-project/models_4/best_models"
+    # files = os.listdir(PATH)
+    # accuracies = {f: 0 for f in files}
+    # for f in files: #os.listdir(PATH):
+    #     print(' ======================================== ')
+    #     print(f)
+    #     fold = int(f[f.index('fold=')+5])
+    #     ff = os.path.join(PATH, f)
+    #     try:
+    #         acc = main(target_mode='cropSingle',  epochs=100, fold=fold, batch_size=32, lr=0.001,
+    #              model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=ff)
+    #         accuracies[f] = acc
+    #     except Exception as e:
+    #         # logging.error(f'ERROR: {e}')
+    #         print(f'cannot run fiel: {ff}')
+    #         print(e)
     # data = {'accuracies': list(accuracies.values()), 'files': list(accuracies.keys())}
     # accuracies = pd.DataFrame(data=data)
     # accuracies.to_csv('accuracies.csv')

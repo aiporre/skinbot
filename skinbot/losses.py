@@ -31,4 +31,8 @@ class MulticlassLoss(torch.nn.Module):
         x = torch.clamp(x, min=1e-6)
         # return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x) - torch.floor(1 - y) * torch.log(1 - x), dim=1))
         # return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x) - torch.floor(1 - y) * torch.log(1 - x), dim=1))
-        return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x), dim=1))
+        # print('torch.ceil(y)', torch.ceil(y) )
+        # with torch.no_grad():
+        #     print('x(prob)', x[0])
+        # return torch.sum(torch.sum(-torch.ceil(y) * torch.log(x), dim=1))
+        return torch.mean(torch.sum(-torch.ceil(y) * torch.log(x) - torch.floor(1 - y) * torch.log(1 - x), dim=1))

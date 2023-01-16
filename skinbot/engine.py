@@ -225,9 +225,9 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         return y_pred_onehot, y_argmax
     def pred_thresholded(output):
         y_pred, y = output
-        print('====> ', y)
-        y_pred = (y_pred > 0.5) * 1.0
-        print('----->', y_pred)
+        y_pred_prob = torch.sigmoid(y_pred)# torch.softmax(y_pred, dim=1)
+        y_pred = (y_pred_prob > 0.5).float()
+        y = (y > 0.0).float()
         return y_pred, y
 
     val_metrics = {
