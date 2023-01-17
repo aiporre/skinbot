@@ -142,6 +142,10 @@ def detection_model(model_name, num_classes, pretrained=True):
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
 
+def segmentation_model(model_name, num_classes, pretrained=True):
+    model = UNet(num_classes)
+    return model
+
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
