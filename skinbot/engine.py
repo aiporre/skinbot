@@ -575,9 +575,140 @@ def configure_engines_detection(target_mode,
 
     return trainer, evaluator
 
+def configure_engines_segmentation(target_mode,
+                                     model,
+                                     optimizer,
+                                     trainer,
+                                     evaluator,
+                                     train_dataloader,
+                                     test_dataloader,
+                                     config,
+                                     display_info,
+                                     fold,
+                                     model_name,
+                                     best_or_last,
+                                     patience,
+                                     model_path):
+    RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
+
+    if display_info and torch.cuda.is_available():
+        from ignite.contrib.metrics import GpuInfo
+
+        GpuInfo().attach(trainer, name='gpu')
+    if config['LOGGER']['logtofile'] == 'True':
+        log_path = get_log_path(config)
+        log_file_handler = open(log_path, 'w')
+        pbar = ProgressBar(persist=True, file=log_file_handler)
+    else:
+        pbar = ProgressBar(persist=True)
+    pbar.attach(trainer, metric_names="all")
+
+
+    # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
+    # def log_training_loss(trainer):
+    # print(f"Epoch[{trainer.state.epoch}] Loss: {trainer.state.output:.2f}")
+
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    def log_training_results(engine):
+        evaluator.run(train_dataloader)
+        metrics = evaluator.state.metrics
+        # print(f"Training Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
+        avg_dice = metrics["Dice"]
+        avg_iou = metrics["IoU"]
+        avg_miou = metrics["mIoU"]
+        pbar.log_message(
+            f"Training Results - Epoch: {engine.state.epoch} "
+            f"Avg Dice: {avg_dice:.2f} "
+            f"Avg IoU: {avg_iou:.2f} "
+            f"Avg mIoU: {avg_miou:.2f}")
+
+
+    @trainer.on(Events.EPOCH_COMPLETED(every=2))
+    def log_validation_results(engine):
+        evaluator.run(test_dataloader)
+        metrics = evaluator.state.metrics
+        # print(f"Validation Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
+        avg_dice = metrics["Dice"]
+        avg_iou = metrics["IoU"]
+        avg_miou = metrics["mIoU"]
+        pbar.log_message(
+            f"Training Results - Epoch: {engine.state.epoch} "
+            f"Avg Dice: {avg_dice:.2f} "
+            f"Avg IoU: {avg_iou:.2f} "
+            f"Avg mIoU: {avg_miou:.2f}")
+        pbar.n = pbar.last_print_n = 0
+        evaluator.fire_event(CheckpointEvents.SAVE_BEST)
+
+
+    to_save = {"weights": model, "optimizer": optimizer}
+    handler_ckpt = Checkpoint(
+        to_save,
+        save_handler=DiskSaver('models', create_dir=True, require_empty=False),
+        n_saved=2,
+        filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
+    )
+    if best_or_last == 'last':
+        last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        if last_checkpoint_path is not None:
+            last_checkpoint_path = os.path.join('models', last_checkpoint_path)
+            to_load = to_save
+            handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+            logging.info(f'loaded last checkpoint {last_checkpoint_path}')
+
+    trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
+
+
+    ## early stopping
+    def score_function(engine):
+        val_loss = engine.state.metrics['loss']
+        return -val_loss
+
+
+    if patience is not None:
+        early_stop_handler = EarlyStopping(patience=patience, score_function=score_function, trainer=trainer)
+        trainer.add_event_handler(Events.EPOCH_COMPLETED, early_stop_handler)
+
+
+    to_save = {'model': model}
+    handler_best = Checkpoint(
+        to_save,
+        save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
+        n_saved=2,
+        filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
+        score_name="dice",
+        # global_step_transform=global_step_from_engine(trainer)
+    )
+
+    if best_or_last == 'best':
+        # get the best model path
+        if model_path is not None:
+            best_model_path = model_path
+        else:
+            # keeps the best_models directory clean
+            keep_best_two('best_models', fold, model_name, target_mode)
+            # get the best model path
+            best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+
+        # if success then load the best model
+        if best_model_path is not None:
+            best_model_path = os.path.join('best_models', best_model_path)
+            to_load = to_save
+            model.load_state_dict(torch.load(best_model_path))
+            to_save['model'] = model
+            logging.info(f'Loaded best model {best_model_path}')
+            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+        else:
+            logging.info(f'No best model found. starting from scratch')
+    evaluator.register_events(*CheckpointEvents)
+    evaluator.add_event_handler(CheckpointEvents.SAVE_BEST, handler_best)
+
+    return trainer, evaluator
+
 
 def configure_engines(target_mode, *args, **kwargs):
-    if 'detection' in target_mode:
+    if 'detection' in target_mode.lower():
         return configure_engines_detection(target_mode, *args, **kwargs)
+    elif 'segmentation' in target_mode.lower():
+        return configure_engines_segmentation(target_mode, *args, **kwargs)
     else:
         return configure_engines_classification(target_mode, *args, **kwargs)
