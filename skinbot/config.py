@@ -57,6 +57,43 @@ class LabelConstantsInfection:
     num_classes = len(target_str_to_num)
 
 
+class LabelSegmentation:
+    target_str_to_num = {
+        'background': 0,
+        'blandSkin': 1,
+        'granulationTissue': 2,
+        'fibrin': 3,
+        'scar': 4,
+        'hyperpigmentation': 5,
+        'xerosis': 6,
+        'erythema': 7,
+        'maceratedSkin': 8,
+        'necrosis': 9,
+        'hematoma': 10,
+        'vessel': 11,
+        'poikoldermSkin': 12
+    }
+
+    target_weights = {
+        'background': 1,
+        'blandSkin': 1,
+        'granulationTissue': 1,
+        'fibrin': 1,
+        'scar': 1,
+        'hyperpigmentation': 1,
+        'xerosis': 1,
+        'erythema': 1,
+        'maceratedSkin': 1,
+        'necrosis': 1,
+        'hematoma': 1,
+        'vessel': 1,
+        'poikoldermSkin': 1,
+    }
+
+    fixed_error_labels = {
+    }
+
+    num_classes = len(target_str_to_num)
 
 class LabelConstantsDemo:
     target_str_to_num = {
@@ -97,6 +134,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsInfection
         elif config['DATASET']['labels'].lower() == 'demo':
             self.labels = LabelConstantsDemo
+        elif config['DATASET']['labels'].lower() == 'segmentation':
+            self.labels = LabelSegmentation
         else:
             raise Exception('Dataset configuration not found.')
 
