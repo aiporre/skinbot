@@ -8,7 +8,7 @@ import torchvision.models.detection
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, create_supervised_trainer, create_supervised_evaluator, Events
 from ignite.handlers import Checkpoint, DiskSaver, EarlyStopping, global_step_from_engine
-from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage
+from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage,DiceCoefficient , IoU, mIoU
 from ignite.engine import EventEnum
 from torch import distributed as dist
 
@@ -173,6 +173,40 @@ def create_detection_evaluator(model, device=None):
 
     return Engine(update_model)
 
+def create_segmentation_trainer(model, optimizer, target_mode, device=None):
+    # make loss according to target mode
+    # compute inverse of class weights
+    v_max = max(C.labels.target_weights.values())
+    target_values_norm = [v_max / v for v in C.labels.target_weights.values()]
+    target_weights_tensor = torch.tensor(target_values_norm, dtype=torch.float32, device=device)
+    # define criterion 2D cross-entropy
+    criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
+    trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
+    return trainer, criterion
+
+def create_segmentation_evaluator(model, criterion, target_mode, device=None):
+
+    def dice_pre(output):
+        y_pred, y = output # (B, Cls, W, H) , (B, W, H)
+        y_pred = torch.softmax(y_pred, dim=1)
+        y_pred = torch.argmax(y_pred, dim=1)
+        y_pred = torch.nn.functional.one_hot(y_pred, num_classe=C.labels.num_classes).float() #(B, W, H, Cls)
+        y_pred = torch.flatten(y_pred, start_dim=1) # (B*W*H, Cla) # binaries one hot encoded
+        y = torch.flatten(y) # (B*W*(H))
+        # y_pred must be one-hot
+        # y integers within [0,C)
+        return y_pred, y
+
+    cm = ConfusionMatrix(num_classes=len(C.labels), output_transform=dice_pre)
+
+    val_metrics = {
+        "Dice": DiceCoefficient(cm),
+        'IoU': IoU(cm),
+        "mIoU": mIoU(cm)
+    }
+
+    evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
+    return evaluator
 def create_classification_trainer(model, optimizer, target_mode, device=None):
     # make loss according to target mode
     if 'single' in target_mode.lower():
