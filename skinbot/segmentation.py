@@ -8,10 +8,10 @@ class ConvBlock(nn.Module):
         if not mid_channels:
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding='same', bias=False),
             nn.BatchNorm2d(mid_channels),
             nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding='same', bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
@@ -45,6 +45,41 @@ class UpSample(nn.Module):
     def forward(self, x):
         return self.up_sample(x)
 
+def pad_to(x, stride):
+    h, w = x.shape[-2:]
+
+    if h % stride > 0:
+        new_h = h + stride - h % stride
+    else:
+        new_h = h
+    if w % stride > 0:
+        new_w = w + stride - w % stride
+    else:
+        new_w = w
+    lh, uh = int((new_h-h) / 2), int(new_h-h) - int((new_h-h) / 2)
+    lw, uw = int((new_w-w) / 2), int(new_w-w) - int((new_w-w) / 2)
+    pads = (lw, uw, lh, uh)
+
+    # zero-padding by default.
+    # See others at https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.pad
+    out = nn.functional.pad(x, pads, "constant", 0)
+
+    return out, pads
+
+def unpad(x, pad):
+    if pad[2]+pad[3] > 0:
+        x = x[:,:,pad[2]:-pad[3],:]
+    if pad[0]+pad[1] > 0:
+        x = x[:,:,:,pad[0]:-pad[1]]
+    return x
+
+def pad_to_match(x, H, W):
+    H_in, W_in = x.shape[-2], x.shape[-1]
+    dH, dW = H-H_in, W-W_in
+    padding = (dW // 2, dW - dW // 2,
+               dH // 2, dH - dH // 2)
+    return nn.functional.pad(x, padding)
+
 class UpSampleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UpSampleConv, self).__init__()
@@ -53,7 +88,8 @@ class UpSampleConv(nn.Module):
 
     def forward(self, x, x_skip):
         x = self.up_sample(x)
-        x = cat([x_skip, x], dim=0)
+        x = pad_to_match(x, x_skip.shape[-2], x_skip.shape[-1])
+        x = cat([x_skip, x], dim=1)
         return self.conv(x)
 
 class UpSampleInterpolation(nn.Module):
@@ -64,11 +100,13 @@ class UpSampleInterpolation(nn.Module):
 
     def forward(self, x, x_skip):
         x = self.up_sample(x)
+        x = pad_to_match(x, x.shape[-2], x.shape[-3])
         x = cat([x_skip, x], dim=0)
         return self.conv(x)
 
 class UNet(nn.Module):
     def __init__(self, in_channels, num_classes, learnable_upsample=True):
+        super(UNet, self).__init__()
         self.first = ConvBlock(in_channels, 64)
         # downsample plath
         self.down_1 = DownSample(64, 128)
@@ -90,15 +128,18 @@ class UNet(nn.Module):
         self.outc = ConvBlock(64, num_classes)
 
     def forward(self, x):
+        x, padding = pad_to(x, 2)
+        print(padding)
         x1 = self.first(x)
-        d1 = self.down_1(x)
-        d2 = self.down_2(x)
-        d3 = self.down_3(x)
-        d4 = self.down_4(x)
+        d1 = self.down_1(x1)
+        d2 = self.down_2(d1)
+        d3 = self.down_3(d2)
+        d4 = self.down_4(d3)
         x = self.up_1(d4, d3)
         x = self.up_2(x, d2)
         x = self.up_3(x, d1)
         x = self.up_4(x, x1)
         x = self.outc(x)
+        x = unpad(x, padding)
         return x
 
