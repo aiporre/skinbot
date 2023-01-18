@@ -292,6 +292,58 @@ class WoundImages(Dataset):
             label = self.target_transform(label)
         return image, label
 
+class WoundSegmentationImages(WoundImages):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=5,
+                 test=False,
+                 crop_lesion=False,
+                 fuzzy_labels=False,
+                 detection=False,
+                 transform=None,
+                 target_transform=None):
+        super(WoundSegmentationImages, self).__init__(
+            root_dir,
+            fold_iteration=fold_iteration,
+            cross_validation_folds=cross_validation_folds,
+            test=test,
+            crop_lesion=crop_lesion,
+            fuzzy_labels=fuzzy_labels,
+            detection=detection,
+            transform=transform,
+            target_transform=target_transform)
+
+    def __make_segmentation_label(self, index):
+        mask = self.__read_one_detection_mask(self.image_fnames[index])[0]
+        ids = [13,14,15,16,17]
+        for _id in ids:
+            mask[mask==id] = 0
+        return mask
+
+    def __getitem__(self, index):
+        image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        try:
+            image = read_image(image_path)/1.0
+        except Exception as e:
+            logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
+            raise e
+        target = self.__make_segmentation_label(index)
+
+        # It uses the detection label if it was created before, otherwise it creates a new one
+        if not self.image_fnames[index] in self._crop_boxes:
+            _label = self.__make_one_detection_label({})
+            boxes = _label['boxes'][_label['labels'] == LESION_LABEL_ID]
+            self._crop_boxes[self.image_fnames[index]] = boxes
+        else:
+            boxes = self._crop_boxes[self.image_fnames[index]]
+        image = crop_lesion(image, boxes)
+        target = crop_lesion(target, boxes)
+
+        if self.transform:
+            image = self.transform(image)
+        if self.target_transform:
+            target = self.target_transform(target)
+        return image, target
 
 class KFold:
     def __init__(self, root_dir, k=10):
