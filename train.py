@@ -60,7 +60,7 @@ def main(best_or_last='best',
     else:
         device = torch.device('cpu')
     # prepare dataset
-    assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy'])
+    assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy','segmentation'])
     if 'multiple' in target_mode.lower() or 'fuzzy' in target_mode.lower():
         assert config['DATASET']['labels'] == 'all', f'Target mode Multiple and fuzzy not compatible with labels in {config_file} use config[dataset][labels] = all'
     if 'detection' in target_mode:
@@ -79,7 +79,6 @@ def main(best_or_last='best',
     if 'detection' in target_mode:
         trainer = create_detection_trainer(model, optimizer, device=device)
         evaluator = create_detection_evaluator(model, device=device)
-
     elif 'segmentation' in target_mode:
         trainer = create_segmentation_trainer(model, optimizer, device=device)
         evaluator = create_segmentation_evaluator(model, device=device)
@@ -182,7 +181,9 @@ if __name__ == "__main__":
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
-    main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    #main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+
+    main(target_mode='segmentation',  epochs=100, fold=0, batch_size=1, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
     # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
     # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"

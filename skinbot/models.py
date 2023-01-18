@@ -6,6 +6,7 @@ from torchvision import datasets, models, transforms
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from skinbot.config import Config
+from skinbot.segmentation import UNet
 
 C = Config()
 
@@ -142,8 +143,8 @@ def detection_model(model_name, num_classes, pretrained=True):
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
 
-def segmentation_model(model_name, num_classes, pretrained=True):
-    model = UNet(num_classes)
+def segmentation_model(model_name, num_classes, freeze='No'):
+    model = UNet(in_channels=3, num_classes=num_classes)
     return model
 
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
@@ -152,6 +153,8 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
         model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze)
     elif model_name == 'faster_rcnn_resnet50_fpn':
         model = detection_model(model_name, C.labels.num_classes)
+    elif model_name == 'unet':
+        model = segmentation_model(model_name, num_classes=C.labels.num_classes, freeze=freeze)
     else:
         raise Exception(f"Model name {model_name} is not defined.")
     if optimizer is not None:

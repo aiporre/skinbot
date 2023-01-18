@@ -149,7 +149,7 @@ class WoundImages(Dataset):
         logging.info('Removing detection without boxes...')
         for index in range(len(self.image_fnames)):
             label = {}
-            label = self.__make_one_detection_label(label, index)
+            label = self._make_one_detection_label(label, index)
             f = self.image_fnames[index]
             if len(label['boxes']) == 0:
                 files_to_remove.append(f)
@@ -185,14 +185,14 @@ class WoundImages(Dataset):
         self.image_fnames = list(fname_labels.keys())
         self.fuzzy_labels = list(fname_labels.values())
 
-    def __read_one_detection_mask(self, fname):
+    def _read_one_detection_mask(self, fname):
         mask_path = os.path.join(self.images_dir,
                                  fname.replace('.jpg', '_watershed_mask.png')
                                  .replace('.JPG', '_watershed_mask.png'))
         mask = read_image(mask_path)
         return mask
 
-    def __make_one_detection_label(self, label, index):
+    def _make_one_detection_label(self, label, index):
         boxes, labels, masks, areas, iscrowd = [], [], [], [], []
         # append boxes for lesions
         # first checks if ther is a json and npy lesion file
@@ -212,7 +212,7 @@ class WoundImages(Dataset):
             boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'], \
                                             detection_json['areas'], detection_json['iscrowd']
         else:
-            mask = self.__read_one_detection_mask(self.image_fnames[index])
+            mask = self._read_one_detection_mask(self.image_fnames[index])
             lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
 
             def analyse_mask(mask, obj_ids, label_id):
@@ -271,11 +271,11 @@ class WoundImages(Dataset):
             label = self.fuzzy_labels[index]
         if self.create_detection:
             label = {'image_label': label}
-            label = self.__make_one_detection_label(label, index)
+            label = self._make_one_detection_label(label, index)
         if self.crop_lesion:
             # It uses the detection label if it was created before, otherwise it creates a new one
             if not self.image_fnames[index] in self._crop_boxes:
-                _label = label if self.create_detection else self.__make_one_detection_label({'image_label': label}, index)
+                _label = label if self.create_detection else self._make_one_detection_label({'image_label': label}, index)
                 boxes = _label['boxes'][_label['labels'] == LESION_LABEL_ID]
                 self._crop_boxes[self.image_fnames[index]] = boxes
             else:
@@ -314,7 +314,7 @@ class WoundSegmentationImages(WoundImages):
             target_transform=target_transform)
 
     def __make_segmentation_label(self, index):
-        mask = self.__read_one_detection_mask(self.image_fnames[index])[0]
+        mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
         ids = [13,14,15,16,17]
         for _id in ids:
             mask[mask==id] = 0
@@ -331,18 +331,22 @@ class WoundSegmentationImages(WoundImages):
 
         # It uses the detection label if it was created before, otherwise it creates a new one
         if not self.image_fnames[index] in self._crop_boxes:
-            _label = self.__make_one_detection_label({})
+            _label = self._make_one_detection_label({}, index=index)
             boxes = _label['boxes'][_label['labels'] == LESION_LABEL_ID]
             self._crop_boxes[self.image_fnames[index]] = boxes
         else:
             boxes = self._crop_boxes[self.image_fnames[index]]
         image = crop_lesion(image, boxes)
-        target = crop_lesion(target, boxes)
+        target = crop_lesion(torch.unsqueeze(target, dim=0), boxes)
+        target = target[0]
 
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
             target = self.target_transform(target)
+        print('image shape', image.shape
+        )
+        print('taget shape', target.shape)
         return image, target
 
 class KFold:
@@ -398,6 +402,7 @@ class KFold:
 
 
 def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, target='segmentation'):
+    assert batch == 1, 'Segmentation only works with batch 1 as in original paper in favor big tiles'
     root_dir = config['DATASET']['root']
     target_transform = None
 
@@ -425,7 +430,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
     assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple',
                       'detectionOnehot', 'detectionSingle', 'detectionString',
-                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString'], \
+                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation'], \
         "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']

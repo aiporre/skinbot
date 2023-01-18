@@ -182,7 +182,7 @@ def create_segmentation_trainer(model, optimizer, device=None):
     # define criterion 2D cross-entropy
     criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
-    return trainer, criterion
+    return trainer
 
 def create_segmentation_evaluator(model, device=None):
 
@@ -197,7 +197,7 @@ def create_segmentation_evaluator(model, device=None):
         # y integers within [0,C)
         return y_pred, y
 
-    cm = ConfusionMatrix(num_classes=len(C.labels), output_transform=dice_pre)
+    cm = ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=dice_pre)
 
     val_metrics = {
         "Dice": DiceCoefficient(cm),
