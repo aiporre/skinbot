@@ -31,6 +31,19 @@ class Models(unittest.TestCase):
         pred = unet(image)
         print('prediction shape: ', pred.shape)
 
+    def test_u_net_interpolation(self):
+        unet = get_model('unet', learnable_upsample=False)
+        # even size h and w image
+        # image = torch.rand((1,3,100,100))
+        # pred = unet(image)
+        # print('prediction shape: ', pred.shape)
+        # image = torch.rand((1, 3, 225, 225))
+        # pred = unet(image)
+        # print('prediction shape: ', pred.shape)
+        image = torch.rand((1, 3, 579, 521))
+        pred = unet(image)
+        print('prediction shape: ', pred.shape)
+
     def test_u_net(self):
         unet = get_model('unet')
         image = torch.rand((1, 3, 579, 521))

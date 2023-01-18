@@ -315,9 +315,9 @@ class WoundSegmentationImages(WoundImages):
 
     def __make_segmentation_label(self, index):
         mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
-        ids = [13,14,15,16,17]
+        ids = [13,14,15,16,17,18,19]
         for _id in ids:
-            mask[mask==id] = 0
+            mask[mask==_id] = 0
         return mask
 
     def __getitem__(self, index):
@@ -339,6 +339,7 @@ class WoundSegmentationImages(WoundImages):
         image = crop_lesion(image, boxes)
         target = crop_lesion(torch.unsqueeze(target, dim=0), boxes)
         target = target[0].long()
+        print(torch.unique(target))
 
         if self.transform:
             image = self.transform(image)

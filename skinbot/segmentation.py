@@ -100,8 +100,8 @@ class UpSampleInterpolation(nn.Module):
 
     def forward(self, x, x_skip):
         x = self.up_sample(x)
-        x = pad_to_match(x, x.shape[-2], x.shape[-3])
-        x = cat([x_skip, x], dim=0)
+        x = pad_to_match(x, x_skip.shape[-2], x_skip.shape[-1])
+        x = cat([x_skip, x], dim=1)
         return self.conv(x)
 
 class UNet(nn.Module):

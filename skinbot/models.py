@@ -143,18 +143,18 @@ def detection_model(model_name, num_classes, pretrained=True):
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
 
-def segmentation_model(model_name, num_classes, freeze='No'):
-    model = UNet(in_channels=3, num_classes=num_classes)
+def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=True):
+    model = UNet(in_channels=3, num_classes=num_classes, learnable_upsample=learnable_upsample)
     return model
 
-def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No'):
+def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', **kwargs):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
         model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze)
     elif model_name == 'faster_rcnn_resnet50_fpn':
         model = detection_model(model_name, C.labels.num_classes)
     elif model_name == 'unet':
-        model = segmentation_model(model_name, num_classes=C.labels.num_classes, freeze=freeze)
+        model = segmentation_model(model_name, num_classes=C.labels.num_classes, freeze=freeze, **kwargs)
     else:
         raise Exception(f"Model name {model_name} is not defined.")
     if optimizer is not None:
