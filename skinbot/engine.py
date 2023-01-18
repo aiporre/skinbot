@@ -180,7 +180,7 @@ def create_segmentation_trainer(model, optimizer, device=None):
     target_values_norm = [v_max / v for v in C.labels.target_weights.values()]
     target_weights_tensor = torch.tensor(target_values_norm, dtype=torch.float32, device=device)
     # define criterion 2D cross-entropy
-    criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
+    criterion = torch.nn.CrossEntropyLoss()
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
     return trainer
 

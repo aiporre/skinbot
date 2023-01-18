@@ -30,5 +30,22 @@ class Models(unittest.TestCase):
         image = torch.rand((1, 3, 579, 521))
         pred = unet(image)
         print('prediction shape: ', pred.shape)
+
+    def test_u_net(self):
+        unet = get_model('unet')
+        image = torch.rand((1, 3, 579, 521))
+        H = 579
+        W = 521
+        labels = torch.randint(0,13, (1, H, W))
+        pred = unet(image)
+        print('prediction shape: ', pred.shape)
+        criterion =  torch.nn.CrossEntropyLoss()
+        loss = criterion(pred, labels)
+        print(loss)
+
+
+
+
+
 if __name__ == '__main__':
     unittest.main()

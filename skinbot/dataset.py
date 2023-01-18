@@ -338,7 +338,7 @@ class WoundSegmentationImages(WoundImages):
             boxes = self._crop_boxes[self.image_fnames[index]]
         image = crop_lesion(image, boxes)
         target = crop_lesion(torch.unsqueeze(target, dim=0), boxes)
-        target = target[0]
+        target = target[0].long()
 
         if self.transform:
             image = self.transform(image)
