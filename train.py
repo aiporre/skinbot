@@ -11,7 +11,8 @@ from sklearn.metrics import classification_report, ConfusionMatrixDisplay, confu
 from skinbot.dataset import get_dataloaders
 from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
-    create_classification_evaluator, create_detection_evaluator, get_best_iteration
+    create_classification_evaluator, create_detection_evaluator, get_best_iteration, create_segmentation_trainer, \
+    create_segmentation_evaluator
 from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam
 from skinbot.models import get_model
 # from skinbot.transformers import num_classes, target_str_to_num
@@ -71,13 +72,17 @@ def main(best_or_last='best',
     train_dataloader = get_dataloaders(config, batch=batch_size, mode='train', fold_iteration=_fold, target=target_mode)
 
     # prepare models
-    model, optimizer = get_model(model_name, optimizer='SGD', lr=LR, momentum=momentum, freeze=freeze)
+    model, optimizer = get_model(model_name, optimizer=optimizer, lr=LR, momentum=momentum, freeze=freeze)
     # move model to gpu
     model.to(device)
     # create trainer and evaluator
     if 'detection' in target_mode:
         trainer = create_detection_trainer(model, optimizer, device=device)
         evaluator = create_detection_evaluator(model, device=device)
+
+    elif 'segmentation' in target_mode:
+        trainer = create_segmentation_trainer(model, optimizer, device=device)
+        evaluator = create_segmentation_evaluator(model, device=device)
     else:
         trainer, criterion = create_classification_trainer(model, optimizer, target_mode, device=device)
         evaluator = create_classification_evaluator(model, criterion, target_mode, device=device)

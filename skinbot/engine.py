@@ -173,7 +173,7 @@ def create_detection_evaluator(model, device=None):
 
     return Engine(update_model)
 
-def create_segmentation_trainer(model, optimizer, target_mode, device=None):
+def create_segmentation_trainer(model, optimizer, device=None):
     # make loss according to target mode
     # compute inverse of class weights
     v_max = max(C.labels.target_weights.values())
@@ -184,7 +184,7 @@ def create_segmentation_trainer(model, optimizer, target_mode, device=None):
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
     return trainer, criterion
 
-def create_segmentation_evaluator(model, criterion, target_mode, device=None):
+def create_segmentation_evaluator(model, device=None):
 
     def dice_pre(output):
         y_pred, y = output # (B, Cls, W, H) , (B, W, H)

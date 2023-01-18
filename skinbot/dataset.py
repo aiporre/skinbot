@@ -397,6 +397,30 @@ class KFold:
             return [self.image_fnames[i] for i in train_indices]
 
 
+def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, target='segmentation'):
+    root_dir = config['DATASET']['root']
+    target_transform = None
+
+    # todo: from confing input_size must be generated of input from the get_model
+    if mode == "all":
+        transform = None # TODO:SegmentationAugmentations(test=True)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
+        shuffle_dataset = False
+    elif mode == 'test':
+        transform = None # TODO:Pretrained(test=True) if not detection else DetectionPretrained(test=True)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True)
+        shuffle_dataset = False
+    elif mode == 'train':
+        transform = None # TODO:Pretrained(test=True) if not detection else DetectionPretrained(test=True)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
+        shuffle_dataset = True
+
+    wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
+
+    return dataloader
+
+
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
     assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple',
@@ -439,6 +463,8 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
         _crop_lesion = True
+    elif target.lower() == 'segmentation':
+        return get_dataloaders_segmentation(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     else:
         raise ValueError(f"Invalid target {target}")
 
