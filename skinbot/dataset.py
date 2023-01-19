@@ -315,9 +315,25 @@ class WoundSegmentationImages(WoundImages):
 
     def __make_segmentation_label(self, index):
         mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
-        ids = [13,14,15,16,17,18,19]
+
+        # objects and backgrounds
+        ids = [14,15,16,17]
         for _id in ids:
             mask[mask==_id] = 0
+
+        # hypertrophic tissue
+        ids = [18, 19, 20, 21, 22, 23]
+        for _id in ids:
+            mask[mask==_id] = 13
+
+        # I guess bland skin??
+        ids = [28, 33]
+        for _id in ids:
+            mask[mask == _id] = 1
+
+        # label scale
+        mask[mask == 13] = 14
+
         return mask
 
     def __getitem__(self, index):

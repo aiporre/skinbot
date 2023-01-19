@@ -71,7 +71,9 @@ class LabelSegmentation:
         'necrosis': 9,
         'hematoma': 10,
         'vessel': 11,
-        'poikoldermSkin': 12
+        'poikoldermSkin': 12,
+        'hypertrophic': 13,
+        'scale': 14
     }
 
     target_weights = {
