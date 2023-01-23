@@ -23,9 +23,9 @@ from skinbot.config import Config
 C = Config()
 
 # TODO: move to a config file
-LESION_LABEL_ID = 1
-SCALE_LABEL_ID = 2
-BACKGROUND_ID = 0
+# LESION_LABEL_ID = 1
+# SCALE_LABEL_ID = 2
+# BACKGROUND_ID = 0
 
 LABEL_COLUMN_NAMES = ['Image Capture',
                       'Rationale for decision',
@@ -222,17 +222,17 @@ class WoundImages(Dataset):
                 masks.extend(_masks)
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
-
-            analyse_mask(mask, lesion_ids, LESION_LABEL_ID)
+            
+            analyse_mask(mask, lesion_ids, C.labels.target_str_to_num['lesion'])
             skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
             skin_ids.pop('blandSkin', None)
-            analyse_mask(mask, skin_ids, LESION_LABEL_ID)
+            analyse_mask(mask, skin_ids, C.labels.target_str_to_num['lesion'])
 
             if len(boxes) == 0:
                 logging.warning(f'Warning: No lesions found in image {self.image_fnames[index]}')
             # getting the scale mask from the image
             scale_id = {"scale": 13}
-            analyse_mask(mask, scale_id, SCALE_LABEL_ID)
+            analyse_mask(mask, scale_id, C.labels.target_str_to_num['scale'])
             # save mask in npy file
             np.save(detection_npy_path, np.array(masks))
             # other info in json file
@@ -270,13 +270,12 @@ class WoundImages(Dataset):
         else:
             label = self.fuzzy_labels[index]
         if self.create_detection:
-            label = {'image_label': label}
-            label = self._make_one_detection_label(label, index)
+            label = self._make_one_detection_label({}, index)
         if self.crop_lesion:
             # It uses the detection label if it was created before, otherwise it creates a new one
             if not self.image_fnames[index] in self._crop_boxes:
-                _label = label if self.create_detection else self._make_one_detection_label({'image_label': label}, index)
-                boxes = _label['boxes'][_label['labels'] == LESION_LABEL_ID]
+                _label = label if self.create_detection else self._make_one_detection_label({}, index)
+                boxes = _label['boxes'][_label['labels'] == C.labels.target_str_to_num['lesion']]
                 self._crop_boxes[self.image_fnames[index]] = boxes
             else:
                 boxes = self._crop_boxes[self.image_fnames[index]]
@@ -348,7 +347,7 @@ class WoundSegmentationImages(WoundImages):
         # It uses the detection label if it was created before, otherwise it creates a new one
         if not self.image_fnames[index] in self._crop_boxes:
             _label = self._make_one_detection_label({}, index=index)
-            boxes = _label['boxes'][_label['labels'] == LESION_LABEL_ID]
+            boxes = _label['boxes'][_label['labels'] == C.labels.target_str_to_num['lesion']]
             self._crop_boxes[self.image_fnames[index]] = boxes
         else:
             boxes = self._crop_boxes[self.image_fnames[index]]

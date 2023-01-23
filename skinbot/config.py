@@ -114,6 +114,24 @@ class LabelConstantsDemo:
 
     num_classes = len(target_str_to_num)
 
+class LabelConstantsDetection:
+    target_str_to_num = {
+        'background': 0,
+        'lesion': 1,
+        'scale': 2
+    }
+
+    target_weights = {
+        'background': 1,
+        'lesion': 1,
+        'scale': 1
+    }
+
+    fixed_error_labels = {
+        'dummy': 'blue'
+    }
+
+    num_classes = len(target_str_to_num)
 def read_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config.read(config_file)
