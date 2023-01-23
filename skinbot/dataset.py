@@ -18,7 +18,7 @@ from torchvision.io import read_image
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
     DetectionTarget, DetectionPretrained, PretrainedSegmentation
 
-from skinbot.config import Config
+from skinbot.config import Config, LabelConstantsDetection
 
 C = Config()
 
@@ -347,7 +347,7 @@ class WoundSegmentationImages(WoundImages):
         # It uses the detection label if it was created before, otherwise it creates a new one
         if not self.image_fnames[index] in self._crop_boxes:
             _label = self._make_one_detection_label({}, index=index)
-            boxes = _label['boxes'][_label['labels'] == C.labels.target_str_to_num['lesion']]
+            boxes = _label['boxes'][_label['labels'] == LabelConstantsDetection.target_str_to_num['lesion']]
             self._crop_boxes[self.image_fnames[index]] = boxes
         else:
             boxes = self._crop_boxes[self.image_fnames[index]]
