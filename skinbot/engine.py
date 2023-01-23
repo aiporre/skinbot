@@ -188,11 +188,12 @@ def create_segmentation_evaluator(model, device=None):
 
     def dice_pre(output):
         y_pred, y = output # (B, Cls, W, H) , (B, W, H)
-        y_pred = torch.softmax(y_pred, dim=1)
-        y_pred = torch.argmax(y_pred, dim=1)
-        y_pred = torch.nn.functional.one_hot(y_pred, num_classe=C.labels.num_classes).float() #(B, W, H, Cls)
-        y_pred = torch.flatten(y_pred, start_dim=1) # (B*W*H, Cla) # binaries one hot encoded
-        y = torch.flatten(y) # (B*W*(H))
+        y = torch.flatten(y) # (B*W*H)
+
+        y_pred = torch.softmax(y_pred, dim=1) # (B, Cls, W, H)
+        y_pred = torch.argmax(y_pred, dim=1)  # (B, 1, W, H)
+        y_pred = torch.flatten(y_pred)  # (B*W*H)
+        y_pred = torch.nn.functional.one_hot(y_pred, num_classes=C.labels.num_classes).float() #(B*W*H, Cls)
         # y_pred must be one-hot
         # y integers within [0,C)
         return y_pred, y

@@ -16,7 +16,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.io import read_image
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
-    DetectionTarget, DetectionPretrained
+    DetectionTarget, DetectionPretrained, PretrainedSegmentation
 
 from skinbot.config import Config
 
@@ -358,12 +358,12 @@ class WoundSegmentationImages(WoundImages):
         print(torch.unique(target))
 
         if self.transform:
-            image = self.transform(image)
+            image, target = self.transform(image, target)
         if self.target_transform:
             target = self.target_transform(target)
-        print('image shape', image.shape
-        )
+        print('image shape', image.shape)
         print('taget shape', target.shape)
+        print('target unique after T: ', torch.unique(target))
         return image, target
 
 class KFold:
@@ -425,15 +425,15 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
 
     # todo: from confing input_size must be generated of input from the get_model
     if mode == "all":
-        transform = None # TODO:SegmentationAugmentations(test=True)
+        transform = PretrainedSegmentation(test=True)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = None # TODO:Pretrained(test=True) if not detection else DetectionPretrained(test=True)
+        transform = PretrainedSegmentation(test=True)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True)
         shuffle_dataset = False
     elif mode == 'train':
-        transform = None # TODO:Pretrained(test=True) if not detection else DetectionPretrained(test=True)
+        transform = PretrainedSegmentation(test=False)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
         shuffle_dataset = True
 
