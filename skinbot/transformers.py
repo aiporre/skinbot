@@ -71,7 +71,7 @@ class Pretrained:
 class PretrainedSegmentation:
     def __init__(self, test=False, input_size=224):
         self.test = test
-        self.Tx = {
+        self.T = {
             'train': transforms.Compose([
                 transforms.RandomResizedCrop(input_size),
                 transforms.RandomHorizontalFlip(),
@@ -79,7 +79,7 @@ class PretrainedSegmentation:
                 transforms.RandomRotation(90),
                 #transforms.ToTensor(),
                 ToFloat(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                transforms.Normalize([0.485, 0.456, 0.406, 0], [0.229, 0.224, 0.225, 1])
             ]),
             'val': transforms.Compose([
                 # transforms.Resize(input_size),
@@ -89,23 +89,15 @@ class PretrainedSegmentation:
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
         }
-        self.Ty = {
-            'train': transforms.Compose([
-                transforms.RandomResizedCrop(input_size),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomVerticalFlip(),
-                transforms.RandomRotation(90),
-                #transforms.ToTensor(),
-                ToFloat(),
-            ]),
-            'val': None
-        }
+
     def __call__(self, x, y):
         if self.test:
             return self.Tx['val'](x), y
         else:
             y = torch.unsqueeze(y, dim=0).float()
-            return self.Tx['train'](x), self.Ty['train'](y)[0].long()
+            xx = torch.cat([x, y], 0)
+            xx = self.Tx['train'](xx)
+            return xx[:3], xx[-1].long()
 
 class DetectionPretrained:
     def __init__(self, test=False):
