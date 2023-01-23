@@ -156,6 +156,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsDemo
         elif config['DATASET']['labels'].lower() == 'segmentation':
             self.labels = LabelSegmentation
+        elif config['DATASET']['labels'].lower() == 'detection':
+            self.labels = LabelConstantsDetection
         else:
             raise Exception('Dataset configuration not found.')
 
