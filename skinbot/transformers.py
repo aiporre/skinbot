@@ -3,6 +3,7 @@ import torch
 from torchvision import transforms
 from skinbot.torchvisionrefs import transforms as detection_transforms
 from skinbot.config import Config
+from collections.abc import Iterable
 
 C = Config()
 
@@ -68,12 +69,24 @@ class Pretrained:
         else:
             return self.T['train'](x)
 
+class PadIfLess:
+    def __init__(self, input_size):
+        self.input_size = max(input_size) if isinstance(input_size, Iterable) else input_size
+        self.pad = transforms.CenterCrop(input_size)
+    def __call__(self, x):
+        H, W = x.shape[-2], x.shape[-1]
+        if H < self.input_size or W < self.input_size:
+            return self.pad(x)
+        else:
+            return x
+
+
 class PretrainedSegmentation:
     def __init__(self, test=False, input_size=224):
         self.test = test
         self.T = {
             'train': transforms.Compose([
-                transforms.RandomResizedCrop(input_size),
+                transforms.RandomCrop(input_size, pad_if_needed=True),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
                 transforms.RandomRotation(90),
@@ -92,11 +105,11 @@ class PretrainedSegmentation:
 
     def __call__(self, x, y):
         if self.test:
-            return self.Tx['val'](x), y
+            return self.T['val'](x), y
         else:
             y = torch.unsqueeze(y, dim=0).float()
             xx = torch.cat([x, y], 0)
-            xx = self.Tx['train'](xx)
+            xx = self.T['train'](xx)
             return xx[:3], xx[-1].long()
 
 class DetectionPretrained:

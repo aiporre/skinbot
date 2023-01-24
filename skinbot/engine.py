@@ -629,14 +629,28 @@ def configure_engines_segmentation(target_mode,
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
         # print(f"Validation Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
-        avg_dice = metrics["Dice"]
-        avg_iou = metrics["IoU"]
+        avg_dice = metrics["Dice"].mean().item()
+        avg_iou = metrics["IoU"].mean().item()
         avg_miou = metrics["mIoU"]
+        evaluator.state.metrics["ValDice"] = avg_dice
         pbar.log_message(
             f"Training Results - Epoch: {engine.state.epoch} "
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
             f"Avg mIoU: {avg_miou:.2f}")
+        stats = "\nMetric "
+        for c in C.labels.target_str_to_num.keys():
+            stats += f"{c}  "
+        stats += "\n Dice  "
+        for v in metrics['Dice']:
+            stats += f"{v:.2f}  "
+
+        stats += "\n IoU  "
+        for v in metrics['IoU']:
+            stats += f"{v:.2f}  "
+
+
+        logging.info(stats)
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 
@@ -676,7 +690,7 @@ def configure_engines_segmentation(target_mode,
         save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
         n_saved=2,
         filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
-        score_name="dice",
+        score_name="ValDice",
         # global_step_transform=global_step_from_engine(trainer)
     )
 
