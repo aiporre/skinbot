@@ -434,11 +434,11 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
         shuffle_dataset = False
     elif mode == 'test':
         transform = PretrainedSegmentation(test=True)
-        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True, fold_iteration=fold_iteration)
         shuffle_dataset = False
     elif mode == 'train':
         transform = PretrainedSegmentation(test=False)
-        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, fold_iteration=fold_iteration)
         shuffle_dataset = True
 
     wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
