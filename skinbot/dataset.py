@@ -104,7 +104,9 @@ class WoundImages(Dataset):
         assert not (detection and fuzzy_labels), 'detection and fuzzy_labels are mutually exclusive'
         assert not (detection and crop_lesion), 'detection and crop_lesion are mutually exclusive'
         if fold_iteration is None:
-            self.image_fnames = [f for f in os.listdir(os.path.join(root_dir, "images"))
+            _files = os.listdir(os.path.join(root_dir, "images"))
+            _files.sort()
+            self.image_fnames = [f for f in _files
                                  if '_mask.' not in f and '_detection.' not in f]
         else:
             self.kfold = KFold(root_dir, k=cross_validation_folds)
@@ -337,6 +339,7 @@ class WoundSegmentationImages(WoundImages):
 
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        print(image_path)
         try:
             image = read_image(image_path)/1.0
         except Exception as e:
@@ -355,7 +358,9 @@ class WoundSegmentationImages(WoundImages):
         target = crop_lesion(torch.unsqueeze(target, dim=0), boxes)
         target = target[0].long()
         print(torch.unique(target))
-
+        print('before T()')
+        print('before image shape', image.shape)
+        print('before taget shape', target.shape)
         if self.transform:
             image, target = self.transform(image, target)
         if self.target_transform:
