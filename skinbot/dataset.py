@@ -318,7 +318,7 @@ class WoundSegmentationImages(WoundImages):
         mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
 
         # objects and backgrounds
-        ids = [14,15,16,17]
+        ids = [14,15,16,17, 255]
         for _id in ids:
             mask[mask==_id] = 0
 
