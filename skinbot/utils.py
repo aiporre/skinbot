@@ -1,4 +1,5 @@
 import logging
+import sys
 import os
 import torch
 
@@ -30,7 +31,11 @@ def configure_logging(config):
         print('Logging to: ', logger_path, ' with level: ', log_level)
         logging.basicConfig(filename=logger_path, filemode='w', level=numeric_level)
     else:
-        logging.basicConfig(level=numeric_level)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logging.basicConfig(level=numeric_level, handlers=[handler])
 
 # PATH FUNCTIONS:
 
