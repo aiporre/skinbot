@@ -1,5 +1,6 @@
 import logging
 import os
+import torch
 
 
 def validate_target_mode(_target_mode, comparable_items):
@@ -31,5 +32,38 @@ def configure_logging(config):
     else:
         logging.basicConfig(level=numeric_level)
 
+# PATH FUNCTIONS:
+
+def patch_indices(W, patch_size, overlap):
+    n = W // (patch_size-overlap)
+    correct = W % (patch_size - overlap) - patch_size
+    small = correct // n
+    indices = [] # collection of tuples
+    for i in range(n):
+        indices.append((i*(patch_size - overlap + small), \
+                       i*(patch_size - overlap + small) + patch_size))
+#         indices.append((i*(patch_size - overlap + small),i*(patch_size - overlap + small) + patch_size))
+    indices.append((n*(patch_size - overlap) + correct, n*(patch_size - overlap) + correct + patch_size))
+    return indices
+
+def make_patches(image, patch_size, overlap=0):
+    C, H, W = image.shape[-3], image.shape[-2], image.shape[-1]
+    x_indices = patch_indices(W, patch_size, overlap)
+    y_indices = patch_indices(H, patch_size, overlap)
+    patches = torch.zeros((len(y_indices), len(x_indices), C, patch_size, patch_size))
+    for i, (ay,by) in enumerate(y_indices):
+        for j, (ax,bx) in enumerate(x_indices):
+            patches[i,j] = image[..., ay:by, ax:bx]
+    return patches
+def join_patches(patches, image_shape, patch_size, overlap):
+    image = torch.zeros(image_shape)
+    # get indices
+    H, W = image.shape[-2], image.shape[-1]
+    x_indices = patch_indices(W, patch_size, overlap)
+    y_indices = patch_indices(H, patch_size, overlap)
+    for i, (ay,by) in enumerate(y_indices):
+        for j, (ax,bx) in enumerate(x_indices):
+            image[..., ay:by, ax:bx] =  patches[i,j] 
+    return image
 
 
