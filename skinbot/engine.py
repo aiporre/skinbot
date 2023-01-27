@@ -11,10 +11,11 @@ from ignite.handlers import Checkpoint, DiskSaver, EarlyStopping, global_step_fr
 from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage,DiceCoefficient , IoU, mIoU
 from ignite.engine import EventEnum
 from torch import distributed as dist
+import numpy as np
 
 from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
 # from skinbot.transformers import num_classes, target_weights
-from skinbot.utils import validate_target_mode, get_log_path
+from skinbot.utils import validate_target_mode, get_log_path, make_patches, join_patches
 from skinbot.config import Config
 
 
@@ -205,8 +206,40 @@ def create_segmentation_evaluator(model, device=None):
         'IoU': IoU(cm),
         "mIoU": mIoU(cm)
     }
+    def evaluate_step(engine, batch):
+        model.eval()
+        if torch.has_cuda:
+            torch.cuda.synchronize()
 
-    evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
+        with torch.no_grad():
+            x, y = batch
+            # remove B=1
+            x, y = x[0], y[0]
+            patch_size = 224 # TODO: hardcoded patch size
+            overlap = 0
+            patches = make_patches(x, patch_size, overlap=overlap)
+            pred_patches = []
+            for i in range(patches.shape[0]):
+                for j in range(patches.shape[1]):
+                    x_patch = torch.unsqueeze(patches[i, j, :, :], dim=0)
+                    pred_patch = model(x_patch)
+                    pred_patches.append(pred_patch)
+            pred_patches = np.array(pred_patches)
+            # channels = prediction channels is the num of classes
+            channels = C.labels.num_classes
+            pred_patches = np.reshape(pred_patches,
+                                      (patches.shape[0], patches.shape[1], channels, patch_size, patch_size))
+            print(pred_patches.shape)
+            H, W = x.shape[-2], x.shape[-1]
+            y_pred = join_patches(pred_patches, (channels, H, W), patch_size, overlap)
+            return  y, y_pred
+
+    # evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
+
+    evaluator = Engine(evaluate_step)
+    for name, metric in val_metrics.items():
+        metric.attach(evaluator, name)
+
     return evaluator
 def create_classification_trainer(model, optimizer, target_mode, device=None):
     # make loss according to target mode
