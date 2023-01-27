@@ -168,8 +168,10 @@ class Config(metaclass=SingletonMeta):
             raise Exception('Dataset configuration not found.')
 
         try:
+            p_parsed = config['DATASET']['segmentation_patch'].split(',')
+            p_size = int(p_parsed[0]), int(p_parsed[1])
             class Segmentation:
-                patch_size = int(config['DATASET']['segmentation_patch'])
+                patch_size = p_size
                 overlap = int(config['DATASET']['segmentation_overlap'])
         except ValueError as e:
             msg = "Error parsing the config.ini check inputs segmentation and overlap must be integer numbers."

@@ -40,6 +40,11 @@ def configure_logging(config):
 # PATH FUNCTIONS:
 
 def patch_indices(W, patch_size, overlap):
+    assert overlap < patch_size*0.5, ' overlap should be at least half of patch size to be sure no repeated partches'
+    if W <= patch_size:
+        indices = [(0,W)]
+        patch_size = W
+        return indices, patch_size
     n = W // (patch_size-overlap)
     correct = W % (patch_size - overlap) - patch_size
     small = correct // n
@@ -49,23 +54,29 @@ def patch_indices(W, patch_size, overlap):
                        i*(patch_size - overlap + small) + patch_size))
 #         indices.append((i*(patch_size - overlap + small),i*(patch_size - overlap + small) + patch_size))
     indices.append((n*(patch_size - overlap) + correct, n*(patch_size - overlap) + correct + patch_size))
-    return indices
+    return indices, patch_size
 
 def make_patches(image, patch_size, overlap=0, device=None):
+    patch_size_y, patch_size_x = patch_size
+
     C, H, W = image.shape[-3], image.shape[-2], image.shape[-1]
-    x_indices = patch_indices(W, patch_size, overlap)
-    y_indices = patch_indices(H, patch_size, overlap)
-    patches = torch.zeros((len(y_indices), len(x_indices), C, patch_size, patch_size), device=device)
+    x_indices, patch_size_x = patch_indices(W, patch_size_x, overlap)
+    y_indices, patch_size_y = patch_indices(H, patch_size_y, overlap)
+
+    patches = torch.zeros((len(y_indices), len(x_indices), C, patch_size_y, patch_size_x), device=device)
     for i, (ay,by) in enumerate(y_indices):
         for j, (ax,bx) in enumerate(x_indices):
             patches[i,j] = image[..., ay:by, ax:bx]
-    return patches
+    return patches, (patch_size_y, patch_size_x)
 def join_patches(patches, image_shape, patch_size, overlap, device=None):
+    patch_size_y, patch_size_x = patch_size
+
     image = torch.zeros(image_shape, device=device)
     # get indices
     H, W = image.shape[-2], image.shape[-1]
-    x_indices = patch_indices(W, patch_size, overlap)
-    y_indices = patch_indices(H, patch_size, overlap)
+    x_indices, patch_size_x = patch_indices(W, patch_size_x, overlap)
+    y_indices, patch_size_y = patch_indices(H, patch_size_y, overlap)
+
     for i, (ay,by) in enumerate(y_indices):
         for j, (ax,bx) in enumerate(x_indices):
             image[..., ay:by, ax:bx] =  patches[i,j] 
