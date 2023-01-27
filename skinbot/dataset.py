@@ -357,17 +357,17 @@ class WoundSegmentationImages(WoundImages):
         image = crop_lesion(image, boxes)
         target = crop_lesion(torch.unsqueeze(target, dim=0), boxes)
         target = target[0].long()
-        print(torch.unique(target))
-        print('before T()')
-        print('before image shape', image.shape)
-        print('before taget shape', target.shape)
+        # print(torch.unique(target))
+        # print('before T()')
+        # print('before image shape', image.shape)
+        # print('before taget shape', target.shape)
         if self.transform:
             image, target = self.transform(image, target)
         if self.target_transform:
             target = self.target_transform(target)
-        print('image shape', image.shape)
-        print('taget shape', target.shape)
-        print('target unique after T: ', torch.unique(target))
+        # print('image shape', image.shape)
+        # print('taget shape', target.shape)
+        # print('target unique after T: ', torch.unique(target))
         return image, target
 
 class KFold:
@@ -427,17 +427,17 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
     root_dir = config['DATASET']['root']
     target_transform = None
 
-    # todo: from confing input_size must be generated of input from the get_model
+    input_size = C.segmentation.patch_size
     if mode == "all":
-        transform = PretrainedSegmentation(test=True)
+        transform = PretrainedSegmentation(test=True, input_size=input_size)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = PretrainedSegmentation(test=True)
+        transform = PretrainedSegmentation(test=True, input_size=input_size)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True, fold_iteration=fold_iteration)
         shuffle_dataset = False
     elif mode == 'train':
-        transform = PretrainedSegmentation(test=False)
+        transform = PretrainedSegmentation(test=False, input_size=input_size)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, fold_iteration=fold_iteration)
         shuffle_dataset = True
 

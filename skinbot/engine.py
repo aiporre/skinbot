@@ -223,8 +223,8 @@ def create_segmentation_evaluator(model, device=None):
             x, y = batch
             # remove B=1
             x = x[0]
-            patch_size = 224  # TODO: hardcoded patch size
-            overlap = 0
+            patch_size = C.segmentation.patch_size
+            overlap = C.segmentation.overlap
             patches = make_patches(x, patch_size, overlap=overlap)
             pred_patches = []
             for i in range(patches.shape[0]):

@@ -83,6 +83,7 @@ class PadIfLess:
 
 class PretrainedSegmentation:
     def __init__(self, test=False, input_size=224):
+        print('inputsize ', type(input_size))
         self.test = test
         self.T = {
             'train': transforms.Compose([

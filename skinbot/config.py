@@ -1,4 +1,5 @@
 import configparser
+import logging
 from threading import Lock
 from skinbot.singleton import SingletonMeta
 
@@ -97,6 +98,7 @@ class LabelSegmentation:
 
     num_classes = len(target_str_to_num)
 
+
 class LabelConstantsDemo:
     target_str_to_num = {
         'blue': 0,
@@ -113,6 +115,7 @@ class LabelConstantsDemo:
     }
 
     num_classes = len(target_str_to_num)
+
 
 class LabelConstantsDetection:
     target_str_to_num = {
@@ -132,6 +135,8 @@ class LabelConstantsDetection:
     }
 
     num_classes = len(target_str_to_num)
+
+
 def read_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config.read(config_file)
@@ -141,6 +146,7 @@ def read_config(config_file='config.ini'):
 class Config(metaclass=SingletonMeta):
     config = None
     labels = None
+    segmentation = None
 
     _instances = {}
 
@@ -161,6 +167,17 @@ class Config(metaclass=SingletonMeta):
         else:
             raise Exception('Dataset configuration not found.')
 
+        try:
+            class Segmentation:
+                patch_size = int(config['DATASET']['segmentation_patch'])
+                overlap = int(config['DATASET']['segmentation_overlap'])
+        except ValueError as e:
+            msg = "Error parsing the config.ini check inputs segmentation and overlap must be integer numbers."
+            logging.error(msg)
+            raise ValueError(msg)
+
+        self.segmentation = Segmentation
+
     def is_config(self):
         return self.config is not None
 
@@ -169,4 +186,3 @@ class Config(metaclass=SingletonMeta):
             return str(self.config['DATASET']['labels'])
         else:
             raise Exception('Config not initialized.')
-

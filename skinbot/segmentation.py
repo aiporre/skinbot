@@ -129,7 +129,6 @@ class UNet(nn.Module):
 
     def forward(self, x):
         x, padding = pad_to(x, 2)
-        print(padding)
         x1 = self.first(x)
         d1 = self.down_1(x1)
         d2 = self.down_2(d1)
