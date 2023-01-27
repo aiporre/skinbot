@@ -88,8 +88,8 @@ def prepare_batch(batch, device=None):
 
 def prepare_batch_seg(batch, device=None):
     x, y = batch
-    x.to(device, non_blocking=True)
-    y.to(device, non_blocking=True)
+    x = x.to(device, non_blocking=True)
+    y = y.to(device, non_blocking=True)
     return x,y
 
 
