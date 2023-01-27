@@ -679,6 +679,7 @@ def configure_engines_segmentation(target_mode,
 
     @trainer.on(Events.EPOCH_COMPLETED(every=2))
     def log_validation_results(engine):
+        print('running validation ....')
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
         # print(f"Validation Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
@@ -686,7 +687,12 @@ def configure_engines_segmentation(target_mode,
         avg_iou = metrics["IoU"].mean().item()
         avg_miou = metrics["mIoU"]
         evaluator.state.metrics["ValDice"] = avg_dice
-        pbar.log_message(
+        print(
+            f"Training Results - Epoch: {engine.state.epoch} "
+            f"Avg Dice: {avg_dice:.2f} "
+            f"Avg IoU: {avg_iou:.2f} "
+            f"Avg mIoU: {avg_miou:.2f}")
+        logging.info(
             f"Training Results - Epoch: {engine.state.epoch} "
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
@@ -703,6 +709,7 @@ def configure_engines_segmentation(target_mode,
             stats += f"{v:.2f}  "
 
         logging.info(stats)
+        print(stats)
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 
