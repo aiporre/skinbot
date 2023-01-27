@@ -86,6 +86,13 @@ def prepare_batch(batch, device=None):
     y = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in y]
     return x, y
 
+def prepare_batch_seg(batch, device=None):
+    x, y = batch
+    x = x.to(device, non_blocking=True)
+    y = y.to(device, non_blocking=True)
+    return x,y
+
+
 
 def reduce_dict(loss_dict):
     if dist.is_available() and dist.is_initialized():
@@ -218,6 +225,8 @@ def create_segmentation_evaluator(model, device=None):
         model.eval()
         if torch.has_cuda:
             torch.cuda.synchronize()
+
+        batch = prepare_batch_seg(batch, device)
 
         with torch.no_grad():
             x, y = batch
