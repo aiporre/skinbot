@@ -51,17 +51,17 @@ def patch_indices(W, patch_size, overlap):
     indices.append((n*(patch_size - overlap) + correct, n*(patch_size - overlap) + correct + patch_size))
     return indices
 
-def make_patches(image, patch_size, overlap=0):
+def make_patches(image, patch_size, overlap=0, device=None):
     C, H, W = image.shape[-3], image.shape[-2], image.shape[-1]
     x_indices = patch_indices(W, patch_size, overlap)
     y_indices = patch_indices(H, patch_size, overlap)
-    patches = torch.zeros((len(y_indices), len(x_indices), C, patch_size, patch_size))
+    patches = torch.zeros((len(y_indices), len(x_indices), C, patch_size, patch_size), device=device)
     for i, (ay,by) in enumerate(y_indices):
         for j, (ax,bx) in enumerate(x_indices):
             patches[i,j] = image[..., ay:by, ax:bx]
     return patches
-def join_patches(patches, image_shape, patch_size, overlap):
-    image = torch.zeros(image_shape)
+def join_patches(patches, image_shape, patch_size, overlap, device=None):
+    image = torch.zeros(image_shape, device=device)
     # get indices
     H, W = image.shape[-2], image.shape[-1]
     x_indices = patch_indices(W, patch_size, overlap)

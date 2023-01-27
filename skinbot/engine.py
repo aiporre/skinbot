@@ -88,8 +88,8 @@ def prepare_batch(batch, device=None):
 
 def prepare_batch_seg(batch, device=None):
     x, y = batch
-    x = x.to(device, non_blocking=True)
-    y = y.to(device, non_blocking=True)
+    x.to(device, non_blocking=True)
+    y.to(device, non_blocking=True)
     return x,y
 
 
@@ -234,7 +234,7 @@ def create_segmentation_evaluator(model, device=None):
             x = x[0]
             patch_size = C.segmentation.patch_size
             overlap = C.segmentation.overlap
-            patches = make_patches(x, patch_size, overlap=overlap)
+            patches = make_patches(x, patch_size, overlap=overlap, device=device)
             pred_patches = []
             for i in range(patches.shape[0]):
                 for j in range(patches.shape[1]):
@@ -248,7 +248,7 @@ def create_segmentation_evaluator(model, device=None):
                                       (patches.shape[0], patches.shape[1], channels, patch_size, patch_size))
             print(pred_patches.shape)
             H, W = x.shape[-2], x.shape[-1]
-            y_pred = join_patches(pred_patches, (channels, H, W), patch_size, overlap)
+            y_pred = join_patches(pred_patches, (channels, H, W), patch_size, overlap, device=device)
             # B =1 again
             y_pred = torch.unsqueeze(y_pred, dim=0)
             return y_pred, y

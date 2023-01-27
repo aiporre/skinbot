@@ -339,7 +339,6 @@ class WoundSegmentationImages(WoundImages):
 
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
-        print(image_path)
         try:
             image = read_image(image_path)/1.0
         except Exception as e:
