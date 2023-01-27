@@ -8,7 +8,7 @@ import torchvision.models.detection
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, create_supervised_trainer, create_supervised_evaluator, Events
 from ignite.handlers import Checkpoint, DiskSaver, EarlyStopping, global_step_from_engine
-from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage,DiceCoefficient , IoU, mIoU
+from ignite.metrics import Accuracy, Loss, ConfusionMatrix, RunningAverage, DiceCoefficient, IoU, mIoU
 from ignite.engine import EventEnum
 from torch import distributed as dist
 import numpy as np
@@ -17,7 +17,6 @@ from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
 # from skinbot.transformers import num_classes, target_weights
 from skinbot.utils import validate_target_mode, get_log_path, make_patches, join_patches
 from skinbot.config import Config
-
 
 from skinbot.torchvisionrefs.coco_eval import CocoEvaluator
 from skinbot.torchvisionrefs.coco_utils import convert_to_coco_api
@@ -36,7 +35,8 @@ class CheckpointEvents(EventEnum):
 def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration=False):
     prefix = f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}_checkpoint"
     if by_iteration:
-        iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+        iterations = [p.split('_')[-1].split('.')[0] for p in os.listdir(path_models) if
+                      p.endswith('.pt') and p.startswith(prefix)]
         iterations = [int(ii) for ii in iterations if ii.isnumeric()]
         if len(iterations) == 0:
             return None
@@ -51,9 +51,11 @@ def get_last_checkpoint(path_models, fold, model_name, target_mode, by_iteration
             return None
         return checkpoints[-1]
 
+
 def get_best_iteration(path_models, fold, model_name, target_mode):
     prefix = f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}_model"
-    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if
+                  p.endswith('.pt') and p.startswith(prefix)]
     if len(iterations) == 0:
         return None
     iterations = [float(ii) for ii in iterations]
@@ -62,9 +64,11 @@ def get_best_iteration(path_models, fold, model_name, target_mode):
     best_model_path = [p for p in os.listdir(path_models) if p.endswith(last_iteration_end) and p.startswith(prefix)][0]
     return best_model_path
 
+
 def keep_best_two(path_models, fold, model_name, target_mode):
     prefix = f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}_model"
-    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if p.endswith('.pt') and p.startswith(prefix)]
+    iterations = [p.split('=')[-1].split('.pt')[0] for p in os.listdir(path_models) if
+                  p.endswith('.pt') and p.startswith(prefix)]
     if len(iterations) < 2:
         return
     iterations = [float(ii) for ii in iterations]
@@ -75,11 +79,13 @@ def keep_best_two(path_models, fold, model_name, target_mode):
         best_model_path = [p for p in os.listdir(path_models) if p.endswith(iteration_end) and p.startswith(prefix)][0]
         os.remove(os.path.join(path_models, best_model_path))
 
+
 def prepare_batch(batch, device=None):
     x, y = batch
     x = list(xx.to(device, non_blocking=True) for xx in x)
     y = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in y]
     return x, y
+
 
 def reduce_dict(loss_dict):
     if dist.is_available() and dist.is_initialized():
@@ -103,6 +109,7 @@ def reduce_dict(loss_dict):
         reduced_losses = {k: v for k, v in zip(names, values)}
     return reduced_losses
 
+
 def get_loss_keys(model, dataloader):
     batch = next(iter(dataloader))
     x, y = prepare_batch(batch)
@@ -111,8 +118,6 @@ def get_loss_keys(model, dataloader):
     loss_dict_reduced = reduce_dict(loss_dict)
     return list(loss_dict_reduced.keys())
 
-        
-        
 
 def create_detection_trainer(model, optimizer, device=None):
     def update_model(engine, batch):
@@ -143,7 +148,7 @@ def create_detection_trainer(model, optimizer, device=None):
             loss_sum.backward()
             engine.state.optimizer.step()
 
-        if hasattr(engine.state,'warmup_scheduler') and engine.state.warmup_scheduler is not None:
+        if hasattr(engine.state, 'warmup_scheduler') and engine.state.warmup_scheduler is not None:
             engine.state.warmup_scheduler.step()
 
         return x, y, loss_dict_reduced
@@ -151,6 +156,7 @@ def create_detection_trainer(model, optimizer, device=None):
     engine = Engine(update_model)
     engine.state.optimizer = optimizer
     return engine
+
 
 def create_detection_evaluator(model, device=None):
     def update_model(engine, batch):
@@ -174,6 +180,7 @@ def create_detection_evaluator(model, device=None):
 
     return Engine(update_model)
 
+
 def create_segmentation_trainer(model, optimizer, device=None):
     # make loss according to target mode
     # compute inverse of class weights
@@ -185,16 +192,16 @@ def create_segmentation_trainer(model, optimizer, device=None):
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
     return trainer
 
+
 def create_segmentation_evaluator(model, device=None):
-
     def dice_pre(output):
-        y_pred, y = output # (B, Cls, W, H) , (B, W, H)
-        y = torch.flatten(y) # (B*W*H)
+        y_pred, y = output  # (B, Cls, W, H) , (B, W, H)
+        y = torch.flatten(y)  # (B*W*H)
 
-        y_pred = torch.softmax(y_pred, dim=1) # (B, Cls, W, H)
+        y_pred = torch.softmax(y_pred, dim=1)  # (B, Cls, W, H)
         y_pred = torch.argmax(y_pred, dim=1)  # (B, 1, W, H)
         y_pred = torch.flatten(y_pred)  # (B*W*H)
-        y_pred = torch.nn.functional.one_hot(y_pred, num_classes=C.labels.num_classes).float() #(B*W*H, Cls)
+        y_pred = torch.nn.functional.one_hot(y_pred, num_classes=C.labels.num_classes).float()  # (B*W*H, Cls)
         # y_pred must be one-hot
         # y integers within [0,C)
         return y_pred, y
@@ -206,6 +213,7 @@ def create_segmentation_evaluator(model, device=None):
         'IoU': IoU(cm),
         "mIoU": mIoU(cm)
     }
+
     def evaluate_step(engine, batch):
         model.eval()
         if torch.has_cuda:
@@ -214,8 +222,8 @@ def create_segmentation_evaluator(model, device=None):
         with torch.no_grad():
             x, y = batch
             # remove B=1
-            x, y = x[0], y[0]
-            patch_size = 224 # TODO: hardcoded patch size
+            x = x[0]
+            patch_size = 224  # TODO: hardcoded patch size
             overlap = 0
             patches = make_patches(x, patch_size, overlap=overlap)
             pred_patches = []
@@ -223,8 +231,8 @@ def create_segmentation_evaluator(model, device=None):
                 for j in range(patches.shape[1]):
                     x_patch = torch.unsqueeze(patches[i, j, :, :], dim=0)
                     pred_patch = model(x_patch)
-                    pred_patches.append(pred_patch)
-            pred_patches = np.array(pred_patches)
+                    pred_patches.append(torch.squeeze(pred_patch, dim=0))
+            pred_patches = torch.stack(pred_patches, dim=0)
             # channels = prediction channels is the num of classes
             channels = C.labels.num_classes
             pred_patches = np.reshape(pred_patches,
@@ -232,7 +240,9 @@ def create_segmentation_evaluator(model, device=None):
             print(pred_patches.shape)
             H, W = x.shape[-2], x.shape[-1]
             y_pred = join_patches(pred_patches, (channels, H, W), patch_size, overlap)
-            return  y, y_pred
+            # B =1 again
+            y_pred = torch.unsqueeze(y_pred, dim=0)
+            return y_pred, y
 
     # evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
 
@@ -241,6 +251,8 @@ def create_segmentation_evaluator(model, device=None):
         metric.attach(evaluator, name)
 
     return evaluator
+
+
 def create_classification_trainer(model, optimizer, target_mode, device=None):
     # make loss according to target mode
     if 'single' in target_mode.lower():
@@ -259,8 +271,8 @@ def create_classification_trainer(model, optimizer, target_mode, device=None):
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
     return trainer, criterion
 
-def create_classification_evaluator(model, criterion, target_mode, device=None):
 
+def create_classification_evaluator(model, criterion, target_mode, device=None):
     def pred_in_prob(output):
         ''' convert prediction and target to one-hot vector '''
         y_pred, y = output
@@ -274,7 +286,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
             y_argmax = y.long()
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
-        y_onehot= torch.nn.functional.one_hot(y_argmax, num_classes=C.labels.num_classes)
+        y_onehot = torch.nn.functional.one_hot(y_argmax, num_classes=C.labels.num_classes)
         return y_pred_onehot, y_onehot
 
     def pred_in_onehot(output):
@@ -291,38 +303,43 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
         return y_pred_onehot, y_argmax
+
     def pred_thresholded(output):
         y_pred, y = output
-        y_pred_prob = torch.sigmoid(y_pred)# torch.softmax(y_pred, dim=1)
+        y_pred_prob = torch.sigmoid(y_pred)  # torch.softmax(y_pred, dim=1)
         y_pred = (y_pred_prob > 0.5).float()
         y = (y > 0.0).float()
         return y_pred, y
 
     val_metrics = {
-        "accuracy": Accuracy() if not validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Accuracy(output_transform=pred_thresholded),
+        "accuracy": Accuracy() if not validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Accuracy(
+            output_transform=pred_thresholded),
         "nll": Loss(criterion),
         "cm": ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot),
-        'cosine': Loss(CosineLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
-        'euclidean': Loss(EuclideanLoss()) if validate_target_mode( target_mode, ['fuzzy', 'multiple']) else Loss(torch.nn.CrossEntropyLoss()),
+        'cosine': Loss(CosineLoss()) if validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Loss(
+            torch.nn.CrossEntropyLoss()),
+        'euclidean': Loss(EuclideanLoss()) if validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Loss(
+            torch.nn.CrossEntropyLoss()),
     }
 
     evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
     return evaluator
 
+
 def configure_engines_classification(target_mode,
-                      model,
-                      optimizer,
-                      trainer,
-                      evaluator,
-                      train_dataloader,
-                      test_dataloader,
-                      config,
-                      display_info,
-                      fold,
-                      model_name,
-                      best_or_last,
-                      patience,
-                      model_path):
+                                     model,
+                                     optimizer,
+                                     trainer,
+                                     evaluator,
+                                     train_dataloader,
+                                     test_dataloader,
+                                     config,
+                                     display_info,
+                                     fold,
+                                     model_name,
+                                     best_or_last,
+                                     patience,
+                                     model_path):
     RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
 
     if display_info and torch.cuda.is_available():
@@ -336,7 +353,6 @@ def configure_engines_classification(target_mode,
     else:
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
-
 
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
     # def log_training_loss(trainer):
@@ -356,7 +372,6 @@ def configure_engines_classification(target_mode,
             f"Avg Cosine: {metrics['cosine']:.2f}"
             f"Avg Euclidean: {metrics['euclidean']:.2f}")
 
-
     @trainer.on(Events.EPOCH_COMPLETED(every=2))
     def log_validation_results(engine):
         evaluator.run(test_dataloader)
@@ -373,7 +388,6 @@ def configure_engines_classification(target_mode,
 
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
-
 
     to_save = {"weights": model, "optimizer": optimizer}
     handler_ckpt = Checkpoint(
@@ -392,17 +406,14 @@ def configure_engines_classification(target_mode,
 
     trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
 
-
     ## early stopping
     def score_function(engine):
         val_loss = engine.state.metrics['loss']
         return -val_loss
 
-
     if patience is not None:
         early_stop_handler = EarlyStopping(patience=patience, score_function=score_function, trainer=trainer)
         trainer.add_event_handler(Events.EPOCH_COMPLETED, early_stop_handler)
-
 
     to_save = {'model': model}
     handler_best = Checkpoint(
@@ -441,21 +452,20 @@ def configure_engines_classification(target_mode,
 
 
 def configure_engines_detection(target_mode,
-                      model,
-                      optimizer,
-                      trainer,
-                      evaluator,
-                      train_dataloader,
-                      test_dataloader,
-                      config,
-                      display_info,
-                      fold,
-                      model_name,
-                      best_or_last,
-                      patience,
-                      model_path):
+                                model,
+                                optimizer,
+                                trainer,
+                                evaluator,
+                                train_dataloader,
+                                test_dataloader,
+                                config,
+                                display_info,
+                                fold,
+                                model_name,
+                                best_or_last,
+                                patience,
+                                model_path):
     from itertools import chain
-
 
     # configure evaluator coco api wrapper functions
     test_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(test_dataloader)))
@@ -471,7 +481,7 @@ def configure_engines_detection(target_mode,
         # accumulate predictions from all images
         engine.state.coco_evaluator.accumulate()
         engine.state.coco_evaluator.summarize()
-        #loading metric values (using hard-code values from coco eval api)
+        # loading metric values (using hard-code values from coco eval api)
         # Average precision and average recall sets in this order:
         # 1. Iou 0.5 to 0.95 (all areas)
         # 2. Iou 0.5 (all areas)
@@ -492,16 +502,19 @@ def configure_engines_detection(target_mode,
 
     # configure logging progress bar
     loss_keys = get_loss_keys(model, train_dataloader)
+
     class RATrans:
         def __init__(self, k):
             self.k = k
-        def __call__(self,output):
+
+        def __call__(self, output):
             x, y, loss = output
             return loss[self.k].item()
 
     for k in loss_keys:
         RunningAverage(output_transform=RATrans(k)).attach(trainer, k)
-    RunningAverage(output_transform=lambda output: sum(loss for loss in output[2].values()).item()).attach(trainer, "loss")
+    RunningAverage(output_transform=lambda output: sum(loss for loss in output[2].values()).item()).attach(trainer,
+                                                                                                           "loss")
 
     if display_info and torch.cuda.is_available():
         from ignite.contrib.metrics import GpuInfo
@@ -526,9 +539,9 @@ def configure_engines_detection(target_mode,
         # avg_nll = metrics["nll"]
         pbar.log_message(
             f"Training Results - Epoch: {engine.state.epoch} "
-        #     f"Avg accuracy: {avg_accuracy:.2f} "
-        #     f"Avg loss: {avg_nll:.2f} "
-        #     f"Avg Cosine: {metrics['cosine']:.2f}"
+            #     f"Avg accuracy: {avg_accuracy:.2f} "
+            #     f"Avg loss: {avg_nll:.2f} "
+            #     f"Avg Cosine: {metrics['cosine']:.2f}"
             f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
 
     @trainer.on(Events.EPOCH_COMPLETED(every=10))
@@ -609,20 +622,21 @@ def configure_engines_detection(target_mode,
 
     return trainer, evaluator
 
+
 def configure_engines_segmentation(target_mode,
-                                     model,
-                                     optimizer,
-                                     trainer,
-                                     evaluator,
-                                     train_dataloader,
-                                     test_dataloader,
-                                     config,
-                                     display_info,
-                                     fold,
-                                     model_name,
-                                     best_or_last,
-                                     patience,
-                                     model_path):
+                                   model,
+                                   optimizer,
+                                   trainer,
+                                   evaluator,
+                                   train_dataloader,
+                                   test_dataloader,
+                                   config,
+                                   display_info,
+                                   fold,
+                                   model_name,
+                                   best_or_last,
+                                   patience,
+                                   model_path):
     RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
 
     if display_info and torch.cuda.is_available():
@@ -636,7 +650,6 @@ def configure_engines_segmentation(target_mode,
     else:
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
-
 
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
     # def log_training_loss(trainer):
@@ -655,7 +668,6 @@ def configure_engines_segmentation(target_mode,
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
             f"Avg mIoU: {avg_miou:.2f}")
-
 
     @trainer.on(Events.EPOCH_COMPLETED(every=2))
     def log_validation_results(engine):
@@ -682,11 +694,9 @@ def configure_engines_segmentation(target_mode,
         for v in metrics['IoU']:
             stats += f"{v:.2f}  "
 
-
         logging.info(stats)
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
-
 
     to_save = {"weights": model, "optimizer": optimizer}
     handler_ckpt = Checkpoint(
@@ -705,17 +715,14 @@ def configure_engines_segmentation(target_mode,
 
     trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
 
-
     ## early stopping
     def score_function(engine):
         val_loss = engine.state.metrics['loss']
         return -val_loss
 
-
     if patience is not None:
         early_stop_handler = EarlyStopping(patience=patience, score_function=score_function, trainer=trainer)
         trainer.add_event_handler(Events.EPOCH_COMPLETED, early_stop_handler)
-
 
     to_save = {'model': model}
     handler_best = Checkpoint(
