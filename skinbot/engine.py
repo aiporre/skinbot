@@ -244,9 +244,8 @@ def create_segmentation_evaluator(model, device=None):
             pred_patches = torch.stack(pred_patches, dim=0)
             # channels = prediction channels is the num of classes
             channels = C.labels.num_classes
-            pred_patches = np.reshape(pred_patches,
+            pred_patches = torch.reshape(pred_patches,
                                       (patches.shape[0], patches.shape[1], channels, patch_size, patch_size))
-            print(pred_patches.shape)
             H, W = x.shape[-2], x.shape[-1]
             y_pred = join_patches(pred_patches, (channels, H, W), patch_size, overlap, device=device)
             # B =1 again
