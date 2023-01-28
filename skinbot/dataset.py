@@ -422,7 +422,6 @@ class KFold:
 
 
 def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, target='segmentation'):
-    assert batch == 1, 'Segmentation only works with batch 1 as in original paper in favor big tiles'
     root_dir = config['DATASET']['root']
     target_transform = None
 
@@ -434,6 +433,7 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
     elif mode == 'test':
         transform = PretrainedSegmentation(test=True, input_size=input_size)
         wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True, fold_iteration=fold_iteration)
+        batch = 1
         shuffle_dataset = False
     elif mode == 'train':
         transform = PretrainedSegmentation(test=False, input_size=input_size)

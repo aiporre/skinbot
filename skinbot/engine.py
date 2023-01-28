@@ -3,6 +3,7 @@ import logging
 import math
 import os
 
+import pandas as pd
 import torch
 import torchvision.models.detection
 from ignite.contrib.handlers import ProgressBar
@@ -678,7 +679,6 @@ def configure_engines_segmentation(target_mode,
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
             f"Avg mIoU: {avg_miou:.2f}")
-
         print(
             f"Training Results - Epoch: {engine.state.epoch} "
             f"Avg Dice: {avg_dice:.2f} "
@@ -689,19 +689,12 @@ def configure_engines_segmentation(target_mode,
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
             f"Avg mIoU: {avg_miou:.2f}")
-        stats = "\nMetric "
-        for c in C.labels.target_str_to_num.keys():
-            stats += f"{c}  "
-        stats += "\n Dice  "
-        for v in metrics['Dice']:
-            stats += f"{v:.2f}  "
-
-        stats += "\n IoU  "
-        for v in metrics['IoU']:
-            stats += f"{v:.2f}  "
-
-        logging.info(stats)
-        print(stats)
+        stats = {"Dice": [v.item() for v in metrics['Dice']],
+                 "IoU": [v.item() for v in metrics['IoU']]}
+        labels = [c for c in C.labels.target_str_to_num.keys()]
+        stats = pd.DataFrame(stats, index=labels)
+        logging.info(f"Stats per class: \n{stats}")
+        print(f"Stats per class: \n{stats}")
 
     @trainer.on(Events.EPOCH_COMPLETED(every=2))
     def log_validation_results(engine):
@@ -723,19 +716,12 @@ def configure_engines_segmentation(target_mode,
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
             f"Avg mIoU: {avg_miou:.2f}")
-        stats = "\nMetric "
-        for c in C.labels.target_str_to_num.keys():
-            stats += f"{c}  "
-        stats += "\n Dice  "
-        for v in metrics['Dice']:
-            stats += f"{v:.2f}  "
-
-        stats += "\n IoU  "
-        for v in metrics['IoU']:
-            stats += f"{v:.2f}  "
-
-        logging.info(stats)
-        print(stats)
+        stats = {"Dice": [v.item() for v in metrics['Dice']],
+                 "IoU": [v.item() for v in metrics['IoU']]}
+        labels = [c for c in C.labels.target_str_to_num.keys()]
+        stats = pd.DataFrame(stats, index=labels)
+        logging.info(f"Stats per class: \n{stats}")
+        print(f"Stats per class: \n{stats}")
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 
