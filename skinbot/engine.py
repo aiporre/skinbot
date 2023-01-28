@@ -670,7 +670,7 @@ def configure_engines_segmentation(target_mode,
         from torch.utils.data import DataLoader
         train_dataloader_validation = DataLoader(dataset=train_dataloader.dataset,
                                                  batch_size=1,
-                                                 shuffle=train_dataloader.shuffle,
+                                                 shuffle=False,
                                                  num_workers=train_dataloader.num_workers)
         evaluator.run(train_dataloader_validation)
         metrics = evaluator.state.metrics
