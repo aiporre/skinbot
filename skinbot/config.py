@@ -1,5 +1,5 @@
 import configparser
-import logging
+import skinbot.logging as logging
 from threading import Lock
 from skinbot.singleton import SingletonMeta
 

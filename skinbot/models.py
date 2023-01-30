@@ -1,4 +1,4 @@
-import logging
+import skinbot.logging as logging
 
 import torch
 import torch.nn as nn

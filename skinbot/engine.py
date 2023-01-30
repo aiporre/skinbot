@@ -1,5 +1,5 @@
 import copy
-import logging
+import skinbot.logging as logging
 import math
 import os
 
@@ -475,7 +475,8 @@ def configure_engines_detection(target_mode,
                                 model_name,
                                 best_or_last,
                                 patience,
-                                model_path):
+                                model_path,
+                                device):
     from itertools import chain
 
     # configure evaluator coco api wrapper functions

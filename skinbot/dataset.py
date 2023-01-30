@@ -2,7 +2,7 @@ import json
 import os
 import random
 import csv
-import logging
+import skinbot.logging as logging
 # try:
 #     import cv2
 # except ImportError:

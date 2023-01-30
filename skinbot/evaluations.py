@@ -1,4 +1,4 @@
-import logging
+import skinbot.logging as logging
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,6 +8,8 @@ from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, Ablat
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from skinbot.dataset import crop_lesion, read_image
+import numpy as np
+
 def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, index=0, target_layer="layer4.2.conv3"):
     """
     plots one calculation of grad cam on model by fiename or index
@@ -90,7 +92,7 @@ def error_analysis(df):
     df["error"] = df["error"].astype(int)
     return df
 
-def plot_bargraph_with_groupings(df, groupby, colourby, title, xlabel, ylabel):
+def plot_bargraph_with_groupings(df, groupby, colourby, title, xlabel, ylabel, FIG_SIZE=(20,20)):
     """
     Plots a dataframe showing the frequency of datapoints grouped by one column and coloured by another.
     df : dataframe
