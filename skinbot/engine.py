@@ -16,7 +16,7 @@ import numpy as np
 
 from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
 # from skinbot.transformers import num_classes, target_weights
-from skinbot.utils import validate_target_mode, get_log_path, make_patches, join_patches
+from skinbot.utils import validate_target_mode, get_log_path, make_patches, join_patches, load_models
 from skinbot.config import Config
 
 from skinbot.torchvisionrefs.coco_eval import CocoEvaluator
@@ -348,7 +348,8 @@ def configure_engines_classification(target_mode,
                                      model_name,
                                      best_or_last,
                                      patience,
-                                     model_path):
+                                     model_path,
+                                     device):
     RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
 
     if display_info and torch.cuda.is_available():
@@ -448,7 +449,8 @@ def configure_engines_classification(target_mode,
         if best_model_path is not None:
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
-            model.load_state_dict(torch.load(best_model_path))
+            # model.load_state_dict(torch.load(best_model_path))
+            load_models(model, best_model_path, device)
             to_save['model'] = model
             logging.info(f'Loaded best model {best_model_path}')
             handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
@@ -619,7 +621,8 @@ def configure_engines_detection(target_mode,
         if best_model_path is not None:
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
-            model.load_state_dict(torch.load(best_model_path))
+            # model.load_state_dict(torch.load(best_model_path))
+            load_models(model, best_model_path, device)
             to_save['model'] = model
             logging.info(f'Loaded best model {best_model_path}')
             handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
@@ -645,7 +648,8 @@ def configure_engines_segmentation(target_mode,
                                    model_name,
                                    best_or_last,
                                    patience,
-                                   model_path):
+                                   model_path,
+                                   device):
     RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
 
     if display_info and torch.cuda.is_available():
@@ -780,10 +784,19 @@ def configure_engines_segmentation(target_mode,
         if best_model_path is not None:
             best_model_path = os.path.join('best_models', best_model_path)
             to_load = to_save
-            model.load_state_dict(torch.load(best_model_path))
+            # model.load_state_dict(torch.load(best_model_path))
+            model = load_models(model, best_model_path, device)
             to_save['model'] = model
             logging.info(f'Loaded best model {best_model_path}')
-            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+            try:
+                handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+            except RuntimeError as e:
+                if torch.cuda.is_available():
+                    state_dict = torch.load(best_model_path, map_location="cuda:0")
+                else:
+                    state_dict = torch.load(best_model_path, map_location='cpu')
+
+                handler_best.load_objects(to_load=to_load, checkpoint={'model': state_dict})
         else:
             logging.info(f'No best model found. starting from scratch')
     evaluator.register_events(*CheckpointEvents)

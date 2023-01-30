@@ -102,4 +102,23 @@ def change_models_to_names(model_path, to_equal_sign=True):
                 f_new = pathlib.Path(f.parent.joinpath(fname))
                 f.rename(f_new)  # TODO: if ever use windows! make try catch
 
-
+def load_models(model, model_path, device):
+    # GPU->GPU
+    # Load
+    try:
+        model.load_state_dict(torch.load(model_path))
+        model.to(device)
+    except:
+        # Load
+        if torch.cuda.is_available():
+            # CPU->GPU
+            # Load
+            # Choose whatever GPU device number you want
+            model.load_state_dict(torch.load(model_path, map_location="cuda:0"))
+            # Make sure to call input = input.to(device) on any input tensors that you feed to the model
+            model.to(device)
+        else:
+            # GPU-> CPU
+            device = torch.device('cpu')
+            model.load_state_dict(torch.load(model_path, map_location=device))
+    return model

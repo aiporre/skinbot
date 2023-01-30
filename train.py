@@ -89,7 +89,7 @@ def main(best_or_last='best',
     # configuration of the engines
     trainer, evaluator = configure_engines( target_mode, model, optimizer, trainer, evaluator, train_dataloader,
                                            test_dataloader, config, display_info, fold,
-                                           model_name, best_or_last, patience, model_path)
+                                           model_name, best_or_last, patience, model_path, device)
     # ---------------------------
     # Run training
     # ---------------------------
