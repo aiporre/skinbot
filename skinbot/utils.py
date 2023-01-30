@@ -121,4 +121,6 @@ def load_models(model, model_path, device):
             # GPU-> CPU
             device = torch.device('cpu')
             model.load_state_dict(torch.load(model_path, map_location=device))
+    print(f'success loading model {model_path} into {device}')
     return model
+
