@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import torch
+import pathlib
 
 
 def validate_target_mode(_target_mode, comparable_items):
@@ -81,5 +82,24 @@ def join_patches(patches, image_shape, patch_size, overlap, device=None):
         for j, (ax,bx) in enumerate(x_indices):
             image[..., ay:by, ax:bx] =  patches[i,j] 
     return image
+
+def change_models_to_names(model_path, to_equal_sign=True):
+    if to_equal_sign:
+        print('Changing from EQ to =')
+    else:
+        print('Changing from = to EQ')
+    model_path = pathlib.Path(model_path)
+    for f in model_path.glob('*.pt'):
+        fname = f.name
+        if to_equal_sign:
+            if "EQ" in fname:
+                fname = fname.replace("EQ", "=")
+                f_new = pathlib.Path(f.parent.joinpath(fname))
+                f.rename(f_new)  # TODO: if ever use windows! make try catch
+        else:
+            if "=" in fname:
+                fname = fname.replace("=", "EQ")
+                f_new = pathlib.Path(f.parent.joinpath(fname))
+                f.rename(f_new)  # TODO: if ever use windows! make try catch
 
 
