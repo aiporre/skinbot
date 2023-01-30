@@ -1,18 +1,22 @@
 import logging
+from skinbot.config import Config
+C = Config()
 
 
 def info(message):
-    print(message)
+    if C.config is not None and C.config['LOGGER']['logtofile'] == 'True':
+        print(message)
     logging.info(message)
 
 def error(message):
-    print(message)
+    if C.config is not None and C.config['LOGGER']['logtofile'] == 'True':
+        print(message)
     logging.error(message)
 
 def warn(message):
-    print(message)
+    if C.config is not None and C.config['LOGGER']['logtofile'] == 'True':
+        print(message)
     logging.warning(message)
 
 def debug(message):
-    print(message)
     logging.debug(message)
