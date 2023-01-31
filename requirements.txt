@@ -1,0 +1,8 @@
+pandas
+matplotlib
+seaborn
+scikit-learn
+scikit-image
+pytorch-ignite
+pycocotools
+grad-cam
