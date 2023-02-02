@@ -1,4 +1,4 @@
-import skinbot.logging
+import skinbot.skinlogging
 import os
 import random
 
@@ -15,7 +15,7 @@ from skinbot.engine import create_classification_trainer, configure_engines, cre
     create_segmentation_evaluator
 from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam
 from skinbot.models import get_model
-import skinbot.logging as logging
+import skinbot.skinlogging as logging
 # from skinbot.transformers import num_classes, target_str_to_num
 
 
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
     #main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
-    # main(target_mode='segmentation',  epochs=100, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
+    main(target_mode='segmentation',  epochs=100, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
     # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
     # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"
@@ -229,4 +229,4 @@ if __name__ == "__main__":
 
     # evaluate models:
 
-    main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
+    # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)

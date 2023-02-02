@@ -1,5 +1,5 @@
 import copy
-import skinbot.logging as logging
+import skinbot.skinlogging as logging
 import math
 import os
 

@@ -6,3 +6,4 @@ scikit-image
 pytorch-ignite
 pycocotools
 grad-cam
+pynvml
