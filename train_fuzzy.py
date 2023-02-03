@@ -1,4 +1,4 @@
-import skinbot.logging
+import skinbot.skinlogging
 import os
 import random
 

@@ -1,4 +1,4 @@
-import skinbot.logging
+import skinbot.skinlogging
 import os
 import random
 
@@ -15,7 +15,7 @@ from skinbot.engine import create_classification_trainer, configure_engines, cre
     create_segmentation_evaluator
 from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam
 from skinbot.models import get_model
-import skinbot.logging as logging
+import skinbot.skinlogging as logging
 # from skinbot.transformers import num_classes, target_str_to_num
 
 

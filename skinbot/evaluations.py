@@ -1,4 +1,4 @@
-import skinbot.logging as logging
+import skinbot.skinlogging as logging
 import os
 import pandas as pd
 import matplotlib.pyplot as plt

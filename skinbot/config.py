@@ -1,5 +1,4 @@
 import configparser
-import skinbot.logging as logging
 from threading import Lock
 from skinbot.singleton import SingletonMeta
 
@@ -175,7 +174,7 @@ class Config(metaclass=SingletonMeta):
                 overlap = int(config['DATASET']['segmentation_overlap'])
         except ValueError as e:
             msg = "Error parsing the config.ini check inputs segmentation and overlap must be integer numbers."
-            logging.error(msg)
+            print(f"ERROR: {msg}")
             raise ValueError(msg)
 
         self.segmentation = Segmentation
