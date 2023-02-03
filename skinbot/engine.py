@@ -87,12 +87,12 @@ def prepare_batch(batch, device=None):
     y = [{k: v.to(device, non_blocking=True) for k, v in t.items()} for t in y]
     return x, y
 
+
 def prepare_batch_seg(batch, device=None):
     x, y = batch
     x = x.to(device, non_blocking=True)
     y = y.to(device, non_blocking=True)
-    return x,y
-
+    return x, y
 
 
 def reduce_dict(loss_dict):
@@ -246,7 +246,7 @@ def create_segmentation_evaluator(model, device=None):
             # channels = prediction channels is the num of classes
             channels = C.labels.num_classes
             pred_patches = torch.reshape(pred_patches,
-                                      (patches.shape[0], patches.shape[1], channels, patch_size[0],patch_size[1]))
+                                         (patches.shape[0], patches.shape[1], channels, patch_size[0], patch_size[1]))
             H, W = x.shape[-2], x.shape[-1]
             y_pred = join_patches(pred_patches, (channels, H, W), patch_size, overlap, device=device)
             # B =1 again
@@ -540,8 +540,9 @@ def configure_engines_detection(target_mode,
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_training_results(engine):
+        logging.info('Running training evaluation (detection): ')
         evaluator.state.coco_evaluator = CocoEvaluator(coco_api_train_dataset, infer_ioutypes_coco_api(model))
         evaluator.run(train_dataloader)
 
@@ -549,27 +550,22 @@ def configure_engines_detection(target_mode,
         # # print(f"Training Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
         IoU_precision_0p5_bbox = metrics["IoU_precision_0.5_bbox"]
         # avg_nll = metrics["nll"]
-        pbar.log_message(
-            f"Training Results - Epoch: {engine.state.epoch} "
-            #     f"Avg accuracy: {avg_accuracy:.2f} "
-            #     f"Avg loss: {avg_nll:.2f} "
-            #     f"Avg Cosine: {metrics['cosine']:.2f}"
-            f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
+        logging.info(f"TRAINING RESULTS: \n"
+                     f"Training Results - Epoch: {engine.state.epoch} "
+                     f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_validation_results(engine):
+        logging.info("Running validation evaluation (detection)...")
         evaluator.state.coco_evaluator = CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
         # # print(f"Training Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
         IoU_precision_0p5_bbox = metrics["IoU_precision_0.5_bbox"]
         # avg_nll = metrics["nll"]
-        pbar.log_message(
-            f"Validation Results - Epoch: {engine.state.epoch} "
-            #     f"Avg accuracy: {avg_accuracy:.2f} "
-            #     f"Avg loss: {avg_nll:.2f} "
-            #     f"Avg Cosine: {metrics['cosine']:.2f}"
-            f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
+        logging.info(f"VALIDATION RESULTS: \n"
+                     f"Validation Results - Epoch: {engine.state.epoch} "
+                     f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 
     to_save = {"weights": model, "optimizer": optimizer}

@@ -134,15 +134,33 @@ def classification_model(model_name, num_outputs, freeze='No', pretrained=True):
     return backbone
 
 def detection_model(model_name, num_classes, pretrained=True):
-    # load an object detection model pre-trained on COCO
-    weights = models.detection.FasterRCNN_ResNet50_FPN_Weights.DEFAULT
-    model = models.detection.fasterrcnn_resnet50_fpn(weights=weights)
-    # get number of input features for the classifier
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    # replace the pre-trained head with a new one
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    if model_name == 'fasterresnet50':
+        # load an object detection model Vj
+        weights = models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+        model = models.detection.fasterrcnn_resnet50_fpn_v2(weights=weights, box_score_thresh=0.9)
+        # get number of input features for the classifier
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        # replace the pre-trained head with a new one
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    elif model_name == 'fastermobilenet':
+        # load an object detection model Vj
+        weights = models.detection.FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
+        model = models.detection.fasterrcnn_mobilenet_v3_large_fpn(weights=weights, box_score_thresh=0.9)
+        # get number of input features for the classifier
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        # replace the pre-trained head with a new one
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    elif model_name == 'maskrcnn':
+        # load an object detection model Vj
+        weights = models.detection.MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+        model = models.detection.maskrcnn_resnet50_fpn_v2(weights=weights)
+        # get number of input features for the classifier
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        # replace the pre-trained head with a new one
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    else:
+        raise ValueError(f'model_name= {model_name} is not a valid option. Try fastermobilenet, fasterresnet50 or maskrcnn')
     return model
-
 def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=True):
     model = UNet(in_channels=3, num_classes=num_classes, learnable_upsample=learnable_upsample)
     return model
@@ -151,7 +169,7 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', *
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
         model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze)
-    elif model_name == 'faster_rcnn_resnet50_fpn':
+    elif 'faster' in model_name or 'mask' in model_name:
         model = detection_model(model_name, C.labels.num_classes)
     elif model_name == 'unet':
         model = segmentation_model(model_name, num_classes=C.labels.num_classes, freeze=freeze, **kwargs)
