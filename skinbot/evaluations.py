@@ -9,6 +9,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from skinbot.dataset import crop_lesion, read_image
 import numpy as np
+from skimage.transform import resize
 
 def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, index=0, target_layer="layer4.2.conv3"):
     """
@@ -48,10 +49,19 @@ def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, inde
     print(rgb_img.shape)
     # plt.imshow(rgb_img)
     # plt.show()
-    fig1, ax = plt.subplots()
+    fig1, ax = plt.subplots(ncols=2)
     grayscale_cam = grayscale_cam[0, :]
-    visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
-    ax.imshow(visualization)
+    # resize to original shape of image
+    # shape = list(dataset.get_image_shape(index))
+    # rgb_img = resize(rgb_img, shape)
+    # grayscale_cam = resize(grayscale_cam, shape[1:])
+    visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True, image_weight=0.6)
+    # visualization = resize(visualization, output_shape=dataset.get_image_shape(index)).transpose(1, 2, 0)
+    ax[0].imshow(rgb_img)
+    ax[0].axis('off')
+    ax[0].set_title(dataset.image_fnames[index])
+    ax[1].imshow(visualization)
+    ax[1].axis('off')
     return fig1, ax
 
 def predict_samples(model, dataloader, fold, target_mode, N=None):

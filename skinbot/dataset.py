@@ -286,7 +286,7 @@ class WoundImages(Dataset):
             # It uses the detection label if it was created before, otherwise it creates a new one
             if not self.image_fnames[index] in self._crop_boxes:
                 _label = label if self.create_detection else self._make_one_detection_label({}, index)
-                boxes = _label['boxes'][_label['labels'] == C.labels.target_str_to_num['lesion']]
+                boxes = _label['boxes'][_label['labels'] == LabelConstantsDetection.target_str_to_num['lesion']]
                 self._crop_boxes[self.image_fnames[index]] = boxes
             else:
                 boxes = self._crop_boxes[self.image_fnames[index]]
@@ -457,10 +457,10 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
 
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
-    assert target in ['onehot', 'single', 'string', 'fuzzy', 'multiple',
-                      'detectionOnehot', 'detectionSingle', 'detectionString',
-                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation'], \
-        "valid options to target mode are 'onehot', 'number' or 'string, or 'fuzzy'"
+    valid_targets =  ['onehot', 'single', 'string', 'fuzzy', 'multiple',
+                      'detection',
+                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation']
+    assert target in valid_targets, f"valid options to target mode are {valid_targets}"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
     fuzzy_labels = False
@@ -472,13 +472,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
         target_transform = TargetValue()
     elif target == 'string':
         target_transform = None
-    elif target == 'detectionOnehot':
-        target_transform = TargetOneHot()
-        detection = True
-    elif target == "detectionSingle":
-        target_transform = TargetValue()
-        detection = True
-    elif target == 'detectionString':
+    elif target == 'detection':
         target_transform = None
         detection = True
     elif target == 'cropOnehot':
@@ -502,8 +496,6 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     else:
         raise ValueError(f"Invalid target {target}")
 
-    if detection:
-        target_transform = DetectionTarget(target_transform)
 
     # todo: from confing input_size must be generated of input from the get_model 
     if mode == "all":
