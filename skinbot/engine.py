@@ -203,15 +203,16 @@ def create_segmentation_trainer(model, optimizer, device=None):
 
 def create_segmentation_evaluator(model, device=None):
     def dice_pre(output):
-        y_pred, y = output  # (B, Cls, W, H) , (B, W, H)
-        y = torch.flatten(y)  # (B*W*H)
+        with torch.no_grad():
+            y_pred, y = output  # (B, Cls, W, H) , (B, W, H)
+            y = torch.flatten(y)  # (B*W*H)
 
-        y_pred = torch.softmax(y_pred, dim=1)  # (B, Cls, W, H)
-        y_pred = torch.argmax(y_pred, dim=1)  # (B, 1, W, H)
-        y_pred = torch.flatten(y_pred)  # (B*W*H)
-        y_pred = torch.nn.functional.one_hot(y_pred, num_classes=C.labels.num_classes).float()  # (B*W*H, Cls)
-        # y_pred must be one-hot
-        # y integers within [0,C)
+            y_pred = torch.softmax(y_pred, dim=1)  # (B, Cls, W, H)
+            y_pred = torch.argmax(y_pred, dim=1)  # (B, 1, W, H)
+            y_pred = torch.flatten(y_pred)  # (B*W*H)
+            y_pred = torch.nn.functional.one_hot(y_pred, num_classes=C.labels.num_classes)  # (B*W*H, Cls)
+            # y_pred must be one-hot
+            # y integers within [0,C)
         return y_pred, y
 
     cm = ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=dice_pre)
@@ -679,7 +680,7 @@ def configure_engines_segmentation(target_mode,
                                                  num_workers=train_dataloader.num_workers)
         evaluator.run(train_dataloader_validation)
         metrics = evaluator.state.metrics
-        print(f"Training Results - Epoch: {trainer.state.epoch}  ")
+        logging.info(f"Training Results - Epoch: {trainer.state.epoch}  ")
         avg_dice = metrics["Dice"].mean().item()
         avg_iou = metrics["IoU"].mean().item()
         avg_miou = metrics["mIoU"]
@@ -689,26 +690,15 @@ def configure_engines_segmentation(target_mode,
             f"Avg Dice: {avg_dice:.2f} "
             f"Avg IoU: {avg_iou:.2f} "
             f"Avg mIoU: {avg_miou:.2f}")
-        print(
-            f"Training Results - Epoch: {engine.state.epoch} "
-            f"Avg Dice: {avg_dice:.2f} "
-            f"Avg IoU: {avg_iou:.2f} "
-            f"Avg mIoU: {avg_miou:.2f}")
-        logging.info(
-            f"Training Results - Epoch: {engine.state.epoch} "
-            f"Avg Dice: {avg_dice:.2f} "
-            f"Avg IoU: {avg_iou:.2f} "
-            f"Avg mIoU: {avg_miou:.2f}")
         stats = {"Dice": [v.item() for v in metrics['Dice']],
                  "IoU": [v.item() for v in metrics['IoU']]}
         labels = [c for c in C.labels.target_str_to_num.keys()]
         stats = pd.DataFrame(stats, index=labels)
         logging.info(f"Stats per class: \n{stats}")
-        print(f"Stats per class: \n{stats}")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=2))
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_validation_results(engine):
-        print('running validation ....')
+        logging.info('running validation ....')
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
         # print(f"Validation Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
@@ -716,11 +706,11 @@ def configure_engines_segmentation(target_mode,
         avg_iou = metrics["IoU"].mean().item()
         avg_miou = metrics["mIoU"]
         evaluator.state.metrics["ValDice"] = avg_dice
-        print(
-            f"Training Results - Epoch: {engine.state.epoch} "
-            f"Avg Dice: {avg_dice:.2f} "
-            f"Avg IoU: {avg_iou:.2f} "
-            f"Avg mIoU: {avg_miou:.2f}")
+        # print(
+        #     f"Training Results - Epoch: {engine.state.epoch} "
+        #     f"Avg Dice: {avg_dice:.2f} "
+        #     f"Avg IoU: {avg_iou:.2f} "
+        #     f"Avg mIoU: {avg_miou:.2f}")
         logging.info(
             f"Training Results - Epoch: {engine.state.epoch} "
             f"Avg Dice: {avg_dice:.2f} "
@@ -731,7 +721,7 @@ def configure_engines_segmentation(target_mode,
         labels = [c for c in C.labels.target_str_to_num.keys()]
         stats = pd.DataFrame(stats, index=labels)
         logging.info(f"Stats per class: \n{stats}")
-        print(f"Stats per class: \n{stats}")
+        # print(f"Stats per class: \n{stats}")
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 

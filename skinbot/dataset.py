@@ -149,14 +149,23 @@ class WoundImages(Dataset):
     def clear_missing_boxes(self):
         files_to_remove = []
         logging.info('Removing detection without boxes...')
-        for index in range(len(self.image_fnames)):
-            label = {}
-            label = self._make_one_detection_label(label, index)
-            f = self.image_fnames[index]
-            if len(label['boxes']) == 0:
-                files_to_remove.append(f)
-            if index % 50 == 0:
-                logging.info(f'finding ... {index}/{len(self.image_fnames)}')
+        clear_missing_fname = os.path.join(self.root_dir, f"missing_boxes_train_fold_{self.kfold}.csv")
+        if os.path.exists(clear_missing_fname):
+            with open(clear_missing_fname, "r") as f:
+                files_to_remove = []
+                for l in f.readlines():
+                    files_to_remove.append(l.replace('\n','').strip())
+        else:
+            for index in range(len(self.image_fnames)):
+                label = {}
+                label = self._make_one_detection_label(label, index)
+                f = self.image_fnames[index]
+                if len(label['boxes']) == 0:
+                    files_to_remove.append(f)
+                if index % 50 == 0:
+                    logging.info(f'finding ... {index}/{len(self.image_fnames)}')
+            with open(clear_missing_fname, 'w') as f:
+                f.writelines(files_to_remove)
 
         for f in files_to_remove:
             logging.info(f'Remove file {f} because it doesn\'t have boxes')
