@@ -5,6 +5,7 @@ import torchvision
 from torch import nn, Tensor
 from torchvision import ops
 from torchvision.transforms import functional as F, InterpolationMode, transforms as T
+from . import functional as F_local
 
 
 def _flip_coco_person_keypoints(kps, width):
@@ -34,7 +35,7 @@ class RandomHorizontalFlip(T.RandomHorizontalFlip):
         if torch.rand(1) < self.p:
             image = F.hflip(image)
             if target is not None:
-                _, _, width = F.get_dimensions(image)
+                _, _, width = F_local.get_dimensions(image)
                 target["boxes"][:, [0, 2]] = width - target["boxes"][:, [2, 0]]
                 if "masks" in target:
                     target["masks"] = target["masks"].flip(-1)
