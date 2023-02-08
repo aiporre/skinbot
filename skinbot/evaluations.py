@@ -64,7 +64,7 @@ def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, inde
     ax[1].axis('off')
     return fig1, ax
 
-def predict_samples(model, dataloader, fold, target_mode, N=None):
+def predict_samples(model, dataloader, fold, target_mode, N=None, device=None):
     model.eval()
     labels = []
     predictions = []
@@ -74,6 +74,7 @@ def predict_samples(model, dataloader, fold, target_mode, N=None):
     with torch.no_grad():
         for batch in dataloader:
             inputs, label = batch
+            inputs = inputs if device is None else inputs.to(device)
             outputs = model(inputs)
             prob = torch.softmax(outputs, dim=1)
             _, predicted = torch.max(outputs, dim=1)
