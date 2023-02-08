@@ -103,6 +103,8 @@ class WoundImages(Dataset):
         # or excusive assertion between detection and fuzzy_labels
         assert not (detection and fuzzy_labels), 'detection and fuzzy_labels are mutually exclusive'
         assert not (detection and crop_lesion), 'detection and crop_lesion are mutually exclusive'
+        self.fold_iteration = fold_iteration
+        self.test = test
         if fold_iteration is None:
             _files = os.listdir(os.path.join(root_dir, "images"))
             _files.sort()
@@ -149,7 +151,8 @@ class WoundImages(Dataset):
     def clear_missing_boxes(self):
         files_to_remove = []
         logging.info('Removing detection without boxes...')
-        clear_missing_fname = os.path.join(self.root_dir, f"missing_boxes_train_fold_{self.kfold}.csv")
+        train_or_test = 'test' if self.test else 'train'
+        clear_missing_fname = os.path.join(self.root_dir, f"missing_boxes_train_fold_{self.fold_iteration}_{train_or_test}.csv")
         if os.path.exists(clear_missing_fname):
             with open(clear_missing_fname, "r") as f:
                 files_to_remove = []
@@ -165,7 +168,8 @@ class WoundImages(Dataset):
                 if index % 50 == 0:
                     logging.info(f'finding ... {index}/{len(self.image_fnames)}')
             with open(clear_missing_fname, 'w') as f:
-                f.writelines(files_to_remove)
+                for file_to_remove in files_to_remove:
+                    f.write(file_to_remove + '\n')
 
         for f in files_to_remove:
             logging.info(f'Remove file {f} because it doesn\'t have boxes')
