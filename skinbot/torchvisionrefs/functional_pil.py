@@ -1,7 +1,5 @@
-import numbers
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, List
 
-import numpy as np
 import torch
 from PIL import Image, ImageEnhance, ImageOps
 try:
