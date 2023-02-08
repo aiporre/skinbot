@@ -387,7 +387,7 @@ class KFold:
         self.k = k
         self.splits_file = os.path.join(root_dir, f"splits_{k}.txt")
         self.image_fnames = [f for f in os.listdir(os.path.join(root_dir, "images"))
-                             if '_mask.' not in f and '_detection.' not in f]
+                             if '_mask.' not in f and '_detection.' not in f and f != 'aux_files']
         self.images_dir = os.path.join(root_dir, "images")
         if not os.path.exists(self.splits_file):
             self.create_splits_file()
