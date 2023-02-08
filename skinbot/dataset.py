@@ -383,7 +383,7 @@ class WoundSegmentationImages(WoundImages):
         return image, target
 
 class KFold:
-    def __init__(self, root_dir, k=10):
+    def __init__(self, root_dir, k=5):
         self.k = k
         self.splits_file = os.path.join(root_dir, f"splits_{k}.txt")
         self.image_fnames = [f for f in os.listdir(os.path.join(root_dir, "images"))
@@ -412,26 +412,26 @@ class KFold:
                 file_writer.writerow([fname, index])
 
     def read_splits(self):
-        fold_indices = []
+        fold_indices = {}
         with open(self.splits_file, mode='r', newline='') as f:
             file_reader = csv.DictReader(f, delimiter=',')
             for row in file_reader:
                 logging.debug(f"row[fold] = {row['fold']}")
-                fold_indices.append(int(row['fold']))
+                fold_indices[row['fname']] = int(row['fold'])
         return fold_indices
 
     def get_split(self, fold_iteration, test=False):
         assert fold_iteration >= 0 and fold_iteration <= self.k - 1, f"fold iteration must be between 0 and {self.k - 1}"
         test_target_value = self.k - fold_iteration - 1
         logging.info(f'Fold label used as testing set is: {test_target_value}')
-        test_indices = list(filter(lambda x: self.fold_indices[x] == test_target_value, range(len(self.fold_indices))))
-        train_indices = list(filter(lambda x: self.fold_indices[x] != test_target_value, range(len(self.fold_indices))))
+        test_indices = list(filter(lambda x: self.fold_indices[x] == test_target_value, self.image_fnames))
+        train_indices = list(filter(lambda x: self.fold_indices[x] != test_target_value, self.image_fnames))
         logging.info('Number of indices test : %d' % len(test_indices))
         logging.info('Number of indices training: %d' % len(train_indices))
         if test:
-            return [self.image_fnames[i] for i in test_indices]
+            return test_indices  # [self.image_fnames[i] for i in test_indices]
         else:
-            return [self.image_fnames[i] for i in train_indices]
+            return train_indices  # [self.image_fnames[i] for i in train_indices]
 
 
 def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, target='segmentation'):
