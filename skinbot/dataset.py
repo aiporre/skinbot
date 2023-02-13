@@ -148,16 +148,18 @@ class WoundImages(Dataset):
                 logging.info('removing aux_files')
                 self.image_fnames.remove(f)
                 continue
+
     def clear_missing_boxes(self):
         files_to_remove = []
         logging.info('Removing detection without boxes...')
         train_or_test = 'test' if self.test else 'train'
-        clear_missing_fname = os.path.join(self.root_dir, f"missing_boxes_train_fold_{self.fold_iteration}_{train_or_test}.csv")
+        clear_missing_fname = os.path.join(self.root_dir,
+                                           f"missing_boxes_train_fold_{self.fold_iteration}_{train_or_test}.csv")
         if os.path.exists(clear_missing_fname):
             with open(clear_missing_fname, "r") as f:
                 files_to_remove = []
                 for l in f.readlines():
-                    files_to_remove.append(l.replace('\n','').strip())
+                    files_to_remove.append(l.replace('\n', '').strip())
         else:
             for index in range(len(self.image_fnames)):
                 label = {}
@@ -174,7 +176,6 @@ class WoundImages(Dataset):
         for f in files_to_remove:
             logging.info(f'Remove file {f} because it doesn\'t have boxes')
             self.image_fnames.remove(f)
-
 
     def load_fuzzy_labels(self):
         fname_labels = {}
@@ -225,7 +226,7 @@ class WoundImages(Dataset):
                 detection_json = json.load(f)
             masks = [_ for _ in np.load(detection_npy_path)]
             boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'], \
-                                            detection_json['areas'], detection_json['iscrowd']
+                detection_json['areas'], detection_json['iscrowd']
         else:
             mask = self._read_one_detection_mask(self.image_fnames[index])
             lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
@@ -237,7 +238,7 @@ class WoundImages(Dataset):
                 masks.extend(_masks)
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
-            
+
             analyse_mask(mask, lesion_ids, C.labels.target_str_to_num['lesion'])
             skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
             skin_ids.pop('blandSkin', None)
@@ -260,7 +261,7 @@ class WoundImages(Dataset):
                 json.dump(detection_json, f, cls=NpEncoder)
         # convert to np.array to speed up conversion to tensor
         boxes, labels, masks, areas, iscrowd = np.array(boxes), np.array(labels), np.array(masks), np.array(areas), \
-                                               np.array(iscrowd)
+            np.array(iscrowd)
         # transform to tensor
         label['boxes'] = torch.as_tensor(boxes, dtype=torch.float32)
         label['labels'] = torch.as_tensor(labels, dtype=torch.int64)
@@ -277,7 +278,7 @@ class WoundImages(Dataset):
         # read the image and converts to float by multiplying by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path)/1.0
+            image = read_image(image_path) / 1.0
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -313,17 +314,20 @@ class WoundMaskedImages(WoundImages):
                  transform=None,
                  target_transform=None):
         super(WoundMaskedImages, self).__init__(root_dir,
-                                                   fold_iteration=fold_iteration,
-                                                   cross_validation_folds=cross_validation_folds,
-                                                   test=test,
-                                                   crop_lesion=False,
-                                                   fuzzy_labels=False,
-                                                   detection=True,
-                                                   transform=transform,
-                                                   target_transform=target_transform)
+                                                fold_iteration=fold_iteration,
+                                                cross_validation_folds=cross_validation_folds,
+                                                test=test,
+                                                crop_lesion=True,
+                                                fuzzy_labels=False,
+                                                detection=True,
+                                                transform=transform,
+                                                target_transform=target_transform)
+
+        self.crop_lesion = True
+        self.fuzzy_labels = False
 
     def __make_wound_mask(self, index):
-        mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
+        mask = super(WoundMaskedImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
         # objects and backgrounds
         ids = [14, 15, 16, 17, 255]
         for _id in ids:
@@ -355,7 +359,7 @@ class WoundMaskedImages(WoundImages):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path)/1.0
+            image = read_image(image_path) / 1.0
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -370,9 +374,9 @@ class WoundMaskedImages(WoundImages):
         mask = torch.stack([mask, mask, mask], dim=0)
 
         # apply mask to image
-        image = mask*image
+        image = mask * image
 
-        # apply crop if required
+        # apply crop if required (AKA always required!!) :) othwise black?
         if self.crop_lesion:
             # It uses the detection label if it was created before, otherwise it creates a new one
             if not self.image_fnames[index] in self._crop_boxes:
@@ -389,6 +393,8 @@ class WoundMaskedImages(WoundImages):
         if self.target_transform:
             label = self.target_transform(label)
         return image, label
+
+
 class WoundDetectionImages(WoundImages):
     def __init__(self, root_dir,
                  fold_iteration=None,
@@ -405,8 +411,6 @@ class WoundDetectionImages(WoundImages):
                                                    detection=True,
                                                    transform=transform,
                                                    target_transform=target_transform)
-        
-
 
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
@@ -448,14 +452,14 @@ class WoundSegmentationImages(WoundImages):
         mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
 
         # objects and backgrounds
-        ids = [14,15,16,17, 255]
+        ids = [14, 15, 16, 17, 255]
         for _id in ids:
-            mask[mask==_id] = 0
+            mask[mask == _id] = 0
 
         # hypertrophic tissue
         ids = [18, 19, 20, 21, 22, 23]
         for _id in ids:
-            mask[mask==_id] = 13
+            mask[mask == _id] = 13
 
         # I guess bland skin??
         ids = [28, 33]
@@ -470,7 +474,7 @@ class WoundSegmentationImages(WoundImages):
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path)/1.0
+            image = read_image(image_path) / 1.0
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -498,6 +502,7 @@ class WoundSegmentationImages(WoundImages):
         # print('taget shape', target.shape)
         # print('target unique after T: ', torch.unique(target))
         return image, target
+
 
 class KFold:
     def __init__(self, root_dir, k=5):
@@ -558,19 +563,21 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
     input_size = C.segmentation.patch_size
     if mode == "all":
         transform = PretrainedSegmentation(test=True, input_size=input_size)
-        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
         transform = PretrainedSegmentation(test=True, input_size=input_size)
-        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, test=True, fold_iteration=fold_iteration)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform, target_transform=target_transform,
+                                               test=True, fold_iteration=fold_iteration)
         batch = 1
         shuffle_dataset = False
     elif mode == 'train':
         transform = PretrainedSegmentation(test=False, input_size=input_size)
-        wound_images = WoundSegmentationImages(root_dir, transform=transform,target_transform=target_transform, fold_iteration=fold_iteration)
+        wound_images = WoundSegmentationImages(root_dir, transform=transform, target_transform=target_transform,
+                                               fold_iteration=fold_iteration)
         shuffle_dataset = True
 
-    wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
+    wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
     dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
 
     return dataloader
@@ -579,13 +586,14 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
 def get_dataloaders_detection(config, batch, mode='all', fold_iteration=0, target='single'):
     def detection_collate(batch):
         return tuple(zip(*batch))
+
     root_dir = config['DATASET']['root']
     target_transform = None
 
     # todo: from confing input_size must be generated of input from the get_model
     if mode == "all":
         transform = DetectionPretrained(test=True)
-        wound_images = WoundDetectionImages(root_dir, transform=transform,  target_transform=target_transform)
+        wound_images = WoundDetectionImages(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
         transform = DetectionPretrained(test=True)
@@ -599,22 +607,52 @@ def get_dataloaders_detection(config, batch, mode='all', fold_iteration=0, targe
                                             transform=transform, target_transform=target_transform)
         shuffle_dataset = True
 
-    wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
+    wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
     dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate)
 
     return dataloader
 
+
+def get_dataloaders_mask(config, batch, mode='all', fold_iteration=0):
+    root_dir = config['DATASET']['root']
+    fuzzy_labels = False
+    _crop_lesion = True
+    target_transform = TargetValue()
+
+    if mode == "all":
+        transform = Pretrained(test=True)
+        wound_images = WoundMaskedImages(root_dir, transform=transform, target_transform=target_transform)
+        shuffle_dataset = False
+    elif mode == 'test':
+        transform = Pretrained(test=True)
+        wound_images = WoundMaskedImages(root_dir, fold_iteration=fold_iteration, test=True,
+                                         transform=transform, target_transform=target_transform)
+
+        shuffle_dataset = False
+    elif mode == 'train':
+        transform = Pretrained(test=False)
+        wound_images = WoundMaskedImages(root_dir, fold_iteration=fold_iteration, test=False,
+                                         transform=transform, target_transform=target_transform)
+        shuffle_dataset = True
+
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
+
+    return dataloader
+
+
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
-    valid_targets =  ['onehot', 'single', 'string', 'fuzzy', 'multiple',
-                      'detection',
-                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation']
+
+    valid_targets = ['onehot', 'single', 'string', 'fuzzy', 'multiple',
+                     'detection',
+                     'maskSingle',
+                     'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation']
     assert target in valid_targets, f"valid options to target mode are {valid_targets}"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
     fuzzy_labels = False
     _crop_lesion = False
-    detection = False
+
     if target == 'onehot':
         # the target is transformed into one hot
         target_transform = TargetOneHot()
@@ -651,11 +689,12 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
         _crop_lesion = True
     elif target.lower() == 'segmentation':
         return get_dataloaders_segmentation(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
+    elif target.lower() == 'masksingle':  # TODO: maybe replace with startswith('mask')
+        return get_dataloaders_mask(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     else:
         raise ValueError(f"Invalid target {target}")
 
-
-    # todo: from confing input_size must be generated of input from the get_model 
+    # todo: from confing input_size must be generated of input from the get_model
     if mode == "all":
         transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, crop_lesion=_crop_lesion, fuzzy_labels=fuzzy_labels, transform=transform,
