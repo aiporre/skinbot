@@ -319,12 +319,12 @@ class WoundMaskedImages(WoundImages):
                                                 test=test,
                                                 crop_lesion=True,
                                                 fuzzy_labels=False,
-                                                detection=True,
+                                                detection=False,
                                                 transform=transform,
                                                 target_transform=target_transform)
 
         self.crop_lesion = True
-        self.fuzzy_labels = False
+        self.fuzzy_labels = None
 
     def __make_wound_mask(self, index):
         mask = super(WoundMaskedImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
@@ -351,13 +351,15 @@ class WoundMaskedImages(WoundImages):
         for _id in ids:
             mask[mask == _id] = 1
 
-        assert max(mask) == 1, f'Mask for image {self.image_fnames[index]} has incorrect labels {np.unique(mask)}'
+
+        assert torch.max(mask).item() == 1, f'Mask for image {self.image_fnames[index]} has incorrect labels {torch.unique(mask)}'
 
         return mask
 
     def __getitem__(self, index):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        print('image path: ', image_path)
         try:
             image = read_image(image_path) / 1.0
         except Exception as e:
@@ -690,7 +692,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     elif target.lower() == 'segmentation':
         return get_dataloaders_segmentation(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     elif target.lower() == 'masksingle':  # TODO: maybe replace with startswith('mask')
-        return get_dataloaders_mask(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
+        return get_dataloaders_mask(config, batch, mode=mode, fold_iteration=fold_iteration)
     else:
         raise ValueError(f"Invalid target {target}")
 
