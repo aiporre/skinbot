@@ -124,3 +124,33 @@ def load_models(model, model_path, device):
     print(f'success loading model {model_path} into {device}')
     return model
 
+def get_image_rotation(image_path):
+    from PIL import Image, ExifTags
+    # starts rotation in None
+    rotation = None
+    try:
+        image = Image.open(image_path)
+        # find the key if exists
+        orientation_key = None
+        for k in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[k] == 'Orientation':
+                orientation_key = k
+                break
+
+        exif = image._getexif()
+
+        if exif[orientation_key] == 3:
+            # image = image.rotate(180, expand=True)
+            rotation = 180
+        elif exif[orientation_key] == 6:
+            # image = image.rotate(270, expand=True)
+            rotation = 270
+        elif exif[orientation_key] == 8:
+            # image = image.rotate(90, expand=True)
+            rotation = 90
+
+    except (AttributeError, KeyError, IndexError):
+        # cases: image don't have getexif
+        pass
+
+    return rotation

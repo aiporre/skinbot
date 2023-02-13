@@ -19,6 +19,9 @@ from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTar
     DetectionTarget, DetectionPretrained, PretrainedSegmentation
 
 from skinbot.config import Config, LabelConstantsDetection
+from torchvision.transforms.functional import rotate
+
+from skinbot.utils import get_image_rotation
 
 C = Config()
 
@@ -360,6 +363,10 @@ class WoundMaskedImages(WoundImages):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
             image = read_image(image_path) / 1.0
+            rotation = get_image_rotation(image_path)
+            if rotation is not None:
+                # then rotate the image
+                image = rotation(image, angle=rotation, expand=True)
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -475,6 +482,11 @@ class WoundSegmentationImages(WoundImages):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
             image = read_image(image_path) / 1.0
+            rotation = get_image_rotation(image_path)
+            if rotation is not None:
+                # then rotate the image
+                image = rotation(image, angle=rotation, expand=True)
+
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
