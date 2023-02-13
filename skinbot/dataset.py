@@ -274,34 +274,32 @@ class WoundImages(Dataset):
         return len(self.image_fnames)
 
     def __getitem__(self, index):
+        # read the image and converts to float by multiplying by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
             image = read_image(image_path)/1.0
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
+        # get the labels fuzzy or single
         if self.fuzzy_labels is None:
             label = self.image_fnames[index].split("_")[0]
         else:
             label = self.fuzzy_labels[index]
-        if self.create_detection:
-            label = self._make_one_detection_label({}, index)
+
         if self.crop_lesion:
-            # It uses the detection label if it was created before, otherwise it creates a new one
+            # if the crop was generated it uses from the memory
             if not self.image_fnames[index] in self._crop_boxes:
-                _label = label if self.create_detection else self._make_one_detection_label({}, index)
+                _label = self._make_one_detection_label({}, index)
                 boxes = _label['boxes'][_label['labels'] == LabelConstantsDetection.target_str_to_num['lesion']]
                 self._crop_boxes[self.image_fnames[index]] = boxes
             else:
                 boxes = self._crop_boxes[self.image_fnames[index]]
             image = crop_lesion(image, boxes)
-        if self.create_detection:
-            # transforms uses two x and y
-            if self.transform:
-                image, target = self.transform(image, label)
-        else:
-            if self.transform and not self.create_detection:
-                image = self.transform(image)
+
+        # apply the transformation to each case image and label
+        if self.transform and not self.create_detection:
+            image = self.transform(image)
         if self.target_transform:
             label = self.target_transform(label)
         return image, label
