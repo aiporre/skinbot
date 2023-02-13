@@ -362,13 +362,12 @@ class WoundMaskedImages(WoundImages):
     def __getitem__(self, index):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
-        print('image path: ', image_path)
         try:
             image = read_image(image_path) / 1.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
-                image = rotation(image, angle=rotation, expand=True)
+                image = rotate(image, angle=rotation, expand=True)
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -649,7 +648,7 @@ def get_dataloaders_mask(config, batch, mode='all', fold_iteration=0):
                                          transform=transform, target_transform=target_transform)
         shuffle_dataset = True
 
-    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, num_workers=4)
 
     return dataloader
 

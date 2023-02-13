@@ -137,7 +137,12 @@ def get_image_rotation(image_path):
                 orientation_key = k
                 break
 
+        if orientation_key is None:
+            return None
+
         exif = image._getexif()
+        if exif is None:
+            return None
 
         if exif[orientation_key] == 3:
             # image = image.rotate(180, expand=True)
