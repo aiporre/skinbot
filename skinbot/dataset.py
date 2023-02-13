@@ -307,6 +307,90 @@ class WoundImages(Dataset):
         return image, label
 
 
+class WoundMaskedImages(WoundImages):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=5,
+                 test=False,
+                 transform=None,
+                 target_transform=None):
+        super(WoundMaskedImages, self).__init__(root_dir,
+                                                   fold_iteration=fold_iteration,
+                                                   cross_validation_folds=cross_validation_folds,
+                                                   test=test,
+                                                   crop_lesion=False,
+                                                   fuzzy_labels=False,
+                                                   detection=True,
+                                                   transform=transform,
+                                                   target_transform=target_transform)
+
+    def __make_wound_mask(self, index):
+        mask = super(WoundSegmentationImages, self)._read_one_detection_mask(self.image_fnames[index])[0]
+        # objects and backgrounds
+        ids = [14, 15, 16, 17, 255]
+        for _id in ids:
+            mask[mask == _id] = 0
+
+        # hypertrophic tissue
+        ids = [18, 19, 20, 21, 22, 23]
+        for _id in ids:
+            mask[mask == _id] = 1
+
+            # I guess bland skin??
+        ids = [28, 33, 1]
+        for _id in ids:
+            mask[mask == _id] = 0
+
+            # label scale
+        mask[mask == 13] = 0
+
+        # wound
+        ids = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        for _id in ids:
+            mask[mask == _id] = 1
+
+        assert max(mask) == 1, f'Mask for image {self.image_fnames[index]} has incorrect labels {np.unique(mask)}'
+
+        return mask
+
+    def __getitem__(self, index):
+        # read image and convert ot floay by diviing by 1.0
+        image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        try:
+            image = read_image(image_path)/1.0
+        except Exception as e:
+            logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
+            raise e
+        # get the two optinos of labels fuzzy or single
+        if self.fuzzy_labels is None:
+            label = self.image_fnames[index].split("_")[0]
+        else:
+            label = self.fuzzy_labels[index]
+
+        # generate mask for only
+        mask = self.__make_wound_mask(index)
+        mask = torch.stack([mask, mask, mask], dim=0)
+
+        # apply mask to image
+        image = mask*image
+
+        # apply crop if required
+        if self.crop_lesion:
+            # It uses the detection label if it was created before, otherwise it creates a new one
+            if not self.image_fnames[index] in self._crop_boxes:
+                _label = self._make_one_detection_label({}, index)
+                boxes = _label['boxes'][_label['labels'] == LabelConstantsDetection.target_str_to_num['lesion']]
+                self._crop_boxes[self.image_fnames[index]] = boxes
+            else:
+                # used the saved crop coordinates if they are in the dictionary self._crop_boxes[...]
+                boxes = self._crop_boxes[self.image_fnames[index]]
+            image = crop_lesion(image, boxes)
+
+        if self.transform and not self.create_detection:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
 class WoundDetectionImages(WoundImages):
     def __init__(self, root_dir,
                  fold_iteration=None,
