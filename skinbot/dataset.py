@@ -576,6 +576,34 @@ def get_dataloaders_segmentation(config, batch, mode='all', fold_iteration=0, ta
     return dataloader
 
 
+def get_dataloaders_detection(config, batch, mode='all', fold_iteration=0, target='single'):
+    def detection_collate(batch):
+        return tuple(zip(*batch))
+    root_dir = config['DATASET']['root']
+    target_transform = None
+
+    # todo: from confing input_size must be generated of input from the get_model
+    if mode == "all":
+        transform = DetectionPretrained(test=True)
+        wound_images = WoundDetectionImages(root_dir, transform=transform,  target_transform=target_transform)
+        shuffle_dataset = False
+    elif mode == 'test':
+        transform = DetectionPretrained(test=True)
+        wound_images = WoundDetectionImages(root_dir, fold_iteration=fold_iteration, test=True,
+                                            transform=transform, target_transform=target_transform)
+
+        shuffle_dataset = False
+    elif mode == 'train':
+        transform = DetectionPretrained(test=False)
+        wound_images = WoundDetectionImages(root_dir, fold_iteration=fold_iteration, test=False,
+                                            transform=transform, target_transform=target_transform)
+        shuffle_dataset = True
+
+    wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate)
+
+    return dataloader
+
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
     valid_targets =  ['onehot', 'single', 'string', 'fuzzy', 'multiple',
@@ -588,27 +616,36 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     _crop_lesion = False
     detection = False
     if target == 'onehot':
+        # the target is transformed into one hot
         target_transform = TargetOneHot()
     elif target == "single":
+        # the target is tranformed from string to num \in [0,C) where C = #classes
         target_transform = TargetValue()
     elif target == 'string':
+        # target is not transformed :!
         target_transform = None
     elif target == 'detection':
-        target_transform = None
-        detection = True
+        # redirects to get dataloaders for detection
+        return get_dataloaders_detection(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     elif target == 'cropOnehot':
+        # the target is transformed into one hot
+        # also crops to wound box
         target_transform = TargetOneHot()
         _crop_lesion = True
     elif target == "cropSingle":
+        # crops and converts to num = 0, 1, 2.... C-1, C = # classes
         target_transform = TargetValue()
         _crop_lesion = True
     elif target == 'cropString':
+        # preservers label as string and crops
         target_transform = None
         _crop_lesion = True
     elif target == 'fuzzy' or target == 'multiple':
+        # gets label as fuzzy = [0 1 0 1, ...]
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
     elif target.lower() == 'cropfuzzy' or target.lower() == 'cropmultiple':
+        # gets label as fuzzy = [1 0 0 0 1....] and also crops
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
         _crop_lesion = True
@@ -620,31 +657,23 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
 
     # todo: from confing input_size must be generated of input from the get_model 
     if mode == "all":
-        transform = Pretrained(test=True) if not detection else DetectionPretrained(test=True)
+        transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, crop_lesion=_crop_lesion, fuzzy_labels=fuzzy_labels, transform=transform,
-                                   target_transform=target_transform, detection=detection)
+                                   target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = Pretrained(test=True) if not detection else DetectionPretrained(test=True)
+        transform = Pretrained(test=True)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, crop_lesion=_crop_lesion,
-                                   fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
-                                   detection=detection)
+                                   fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
-        transform = Pretrained(test=False) if not detection else DetectionPretrained(test=False)
+        transform = Pretrained(test=False)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, crop_lesion=_crop_lesion,
-                                   fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform,
-                                   detection=detection)
+                                   fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
         shuffle_dataset = True
-    def detection_collate(batch):
-        return tuple(zip(*batch))
 
-    if 'detection' in target:
-        wound_images.clear_missing_boxes() # only labels with boxes are considered for training and evaluation of detection models
-        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate)
-    else:
-        dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
 
     return dataloader
 
