@@ -306,6 +306,41 @@ class WoundImages(Dataset):
             label = self.target_transform(label)
         return image, label
 
+
+class WoundDetectionImages(WoundImages):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=4,
+                 test=False,
+                 transform=None,
+                 target_transform=None):
+        super(WoundDetectionImages, self).__init__(root_dir,
+                                                   fold_iteration=fold_iteration,
+                                                   cross_validation_folds=cross_validation_folds,
+                                                   test=test,
+                                                   crop_lesion=False,
+                                                   fuzzy_labels=False,
+                                                   detection=True,
+                                                   transform=transform,
+                                                   target_transform=target_transform)
+        
+
+
+    def __getitem__(self, index):
+        image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        try:
+            image = read_image(image_path) / 1.0
+        except Exception as e:
+            logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
+            raise e
+        label = self._make_one_detection_label({}, index)
+        if self.transform:
+            image, target = self.transform(image, label)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
+
+
 class WoundSegmentationImages(WoundImages):
     def __init__(self, root_dir,
                  fold_iteration=None,
