@@ -36,7 +36,7 @@ LR = 0.00001
 display_info = True
 # gpu device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-MODELS_PATH = "/media/doom/GG2/skin-project/models_4_last_CNN_models/best_models"
+MODELS_PATH = f"/media/{os.environ['USER']}/GG2/skin-project/models_4_last_CNN_models/best_models"
 
 
 """
@@ -102,7 +102,7 @@ folds_num = 5
 for _fold in range(folds_num):
     all_dataloader = get_dataloaders(config, batch=16, mode='test', target='cropSingle', fold_iteration=_fold)
     dataset = all_dataloader.dataset
-    predictions_csv = f'/home/doom/Documents/Phd/code/skinbot/predictions_fold={_fold}_resnet101_cropSingle.csv'
+    predictions_csv = os.path.join(os.getcwd(), f'predictions_fold={_fold}_resnet101_cropSingle.csv')
     for i in range(len(dataset)):
         print(f"fold = {_fold}, image name= {dataset.image_fnames[i]}, index={i}")
         plot_sample(i, predictions_csv)
@@ -114,7 +114,7 @@ df_all_preds = None
 for _fold in range(folds_num):
     all_dataloader = get_dataloaders(config, batch=16, mode='test', target='cropSingle', fold_iteration=_fold)
     dataset = all_dataloader.dataset
-    predictions_csv = f'/home/doom/Documents/Phd/code/skinbot/predictions_fold={_fold}_resnet101_cropSingle.csv'
+    predictions_csv = os.path.join(os.getcwd(), f'predictions_fold={_fold}_resnet101_cropSingle.csv')
     if df_all_preds is None:
         df_all_preds = pd.read_csv(predictions_csv)
         df_all_preds['fold'] = [_fold]*len(dataset)
