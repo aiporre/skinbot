@@ -408,7 +408,10 @@ def configure_engines_classification(target_mode,
         filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
     )
     if best_or_last == 'last':
-        last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        if model_path is None:
+            last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        else:
+            last_checkpoint_path = model_path
         if last_checkpoint_path is not None:
             last_checkpoint_path = os.path.join('models', last_checkpoint_path)
             to_load = to_save
@@ -577,7 +580,10 @@ def configure_engines_detection(target_mode,
         filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
     )
     if best_or_last == 'last':
-        last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        if model_path is None:
+            last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        else:
+            last_checkpoint_path = model_path
         if last_checkpoint_path is not None:
             last_checkpoint_path = os.path.join('models', last_checkpoint_path)
             to_load = to_save
@@ -729,7 +735,10 @@ def configure_engines_segmentation(target_mode,
         filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
     )
     if best_or_last == 'last':
-        last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        if model_path is not None:
+            last_checkpoint_path = model_path
+        else:
+            last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
         if last_checkpoint_path is not None:
             last_checkpoint_path = os.path.join('models', last_checkpoint_path)
             to_load = to_save
