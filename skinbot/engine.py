@@ -127,6 +127,56 @@ def get_loss_keys(model, dataloader):
     return list(loss_dict_reduced.keys())
 
 
+def ae_prepare_batch(batch, device='cpu'):
+    x, y = batch
+    x = x.to(device)
+    y = y.to(device)
+    return x, y
+
+
+def create_autoencoder_trainer(model, optimizer, device=None):
+    def update_model(engine, batch):
+        model.train()
+        # prepaere batch
+        x, y = ae_prepare_batch(batch, device=device)
+        # sync all GPU
+        if torch.has_cuda:
+            torch.cuda.synchronize()
+        # make a prediction reconstruction of vector x
+        x_hat = model(x, y=y)
+        engine.state.optimizer.zero_grad()
+        loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
+        loss.backward()
+        engine.state.optimizer.step()
+        loss_value = loss.item()
+
+        if hasattr(engine.state, 'warmup_scheduler') and engine.state.warmup_scheduler is not None:
+            engine.state.warmup_scheduler.step()
+
+        return x, y, loss_value
+
+    engine = Engine(update_model)
+    engine.state.optimizer = optimizer
+    return engine
+
+
+def create_autoencoder_evaluator(model, device=None):
+    def update_model(engine, batch):
+        model.eval()
+        x, y = ae_prepare_batch(batch, device=device)
+
+        if torch.has_cuda:
+            torch.cuda.synchronize()
+        # start evaluation
+        with torch.no_grad():
+            x_hat = model(x, y=y)
+            engine.state.metrics['mse'] = ((x_hat-x)**2).mean()
+            engine.state.metrics['mae'] = (torch.absolute(x_hat-x)).mean()
+            engine.state.metrics['kl'] = model.compute_kl()
+        return x, y
+
+    return Engine(update_model)
+
 def create_detection_trainer(model, optimizer, device=None):
     def update_model(engine, batch):
         model.train()
