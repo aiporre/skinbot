@@ -432,7 +432,7 @@ def configure_engines_classification(target_mode,
         save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
         n_saved=2,
         filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
-        score_name="accuracy",
+        score_name="nll",
         # global_step_transform=global_step_from_engine(trainer)
     )
 
