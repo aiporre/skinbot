@@ -15,9 +15,9 @@ def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
 
 
 class Encoder(nn.Module):
-    def __init__(self, num_inputs, latent_dims):
+    def __init__(self, num_inputs, latent_dims, layers=None):
         super(Encoder, self).__init__()
-        self.encoder_mlp = get_mlp(num_inputs, latent_dims, dropout=0)
+        self.encoder_mlp = get_mlp(num_inputs, latent_dims, dropout=0, layers=layers)
 
     def forward(self, x, y=None):
         x = torch.flatten(x, start_dim=1)
@@ -27,22 +27,22 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dims, num_outputs):
+    def __init__(self, latent_dims, num_outputs, layers=None):
         super(Decoder, self).__init__()
-        self.decoder_mlp = get_mlp(latent_dims, num_outputs, dropout=0)
+        self.decoder_mlp = get_mlp(latent_dims, num_outputs, dropout=0, layers=layers)
 
     def forward(self, z):
         return self.decoder_mlp(z)
 class AutoEncoder(nn.Module):
-    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None):
+    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None):
         super(AutoEncoder, self).__init__()
         if num_classes is not None:
-            self.encoder = Encoder(num_inputs, latent_dims)
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs)
+            self.encoder = Encoder(num_inputs, latent_dims, layers=layers)
+            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = False
         else:
-            self.encoder = Encoder(num_inputs, latent_dims)
-            self.decoder = Decoder(latent_dims, num_outputs)
+            self.encoder = Encoder(num_inputs, latent_dims, layers=layers)
+            self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = True
 
     def forward(self, x, y=None):
@@ -52,9 +52,9 @@ class AutoEncoder(nn.Module):
 
 
 class VariationalEncoder(nn.Module):
-    def __init__(self, num_inputs, latent_dims):
+    def __init__(self, num_inputs, latent_dims, layers=None):
         super(VariationalEncoder, self).__init__()
-        self.encoder_mlp = get_mlp(num_inputs, 512, dropout=0)
+        self.encoder_mlp = get_mlp(num_inputs, 512, dropout=0, layers=layers)
         # TODO: 512 is hardcoded
         self.mean_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
         self.std_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
@@ -75,15 +75,15 @@ class VariationalEncoder(nn.Module):
 
 
 class VariationalAutoEncoder(nn.Module):
-    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None):
+    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None):
         super(VariationalAutoEncoder, self).__init__()
         if num_classes is not None:
-            self.encoder = Encoder(num_inputs, latent_dims)
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs)
+            self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
+            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = False
         else:
-            self.encoder = Encoder(num_inputs, latent_dims)
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs)
+            self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
+            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = True
 
     def compute_kl(self):

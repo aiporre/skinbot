@@ -171,6 +171,7 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
     num_inputs = eval(C['AUTOENCODER']['num_inputs'])
     num_outputs = eval(C['AUTOENCODER']['num_outputs'])
     latent_dims = int(C['AUTOENCODER']['latent_dims'])
+    layers = eval(C['AUTOENCODER']['layers'])
     assert len(num_inputs) == len(num_outputs) and len(num_inputs) < 4,\
         f'Wrong config.ini. Num_inputs must be the same a num_outputs. And max only three. Given {num_inputs}'
     # infers if convolutional activativate
@@ -190,14 +191,14 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
         #     model = VariationalAutoEncoder(in_channels=3, num_classes=num_classes, conditional=True)
     else:
         if model_name == 'ae':
-            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims)
+            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers)
         elif model_name == 'vae':
-            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims)
+            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers)
         elif model_name == 'cae':
-            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes, latent_dims=latent_dims)
+            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes, latent_dims=latent_dims, layers=layers)
         else:
             # model_name is then CVAE
-            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes, latent_dims=latent_dims)
+            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes, latent_dims=latent_dims, layers=layers)
     return model
 
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', **kwargs):
