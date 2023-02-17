@@ -61,11 +61,16 @@ def main(best_or_last='best',
     else:
         device = torch.device('cpu')
     # prepare dataset
-    assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy','segmentation', 'detection'])
+    assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy','segmentation', 'detection',
+                                              'reconstruction'])
     if 'multiple' in target_mode.lower() or 'fuzzy' in target_mode.lower():
         assert config['DATASET']['labels'] == 'all', f'Target mode Multiple and fuzzy not compatible with labels in {config_file} use config[dataset][labels] = all'
     if 'detection' in target_mode:
         valid_detection_models = ['fasterresnet50', 'fastermobilenet','maskrcnn']
+        assert model_name in valid_detection_models, f'{target_mode} requires model ({valid_detection_models})'
+
+    if 'construction' in target_mode:
+        valid_detection_models = ['ae', 'vae', 'cae', 'cvae']
         assert model_name in valid_detection_models, f'{target_mode} requires model ({valid_detection_models})'
 
     _fold = fold if not external_data else None
@@ -99,30 +104,29 @@ def main(best_or_last='best',
     else:
         random.seed(0)
 
-        logging.info("===> Plotting one grad CAM")
-        ax, fig = plot_one_grad_cam(model, dataloader=test_dataloader, target_mode=target_mode, index=10)
-        plt.show()
-
-        return
-        # logging.info('dataset statistics')
-        # all_dataloader = get_dataloaders(config, batch=16, mode='all')
-        # all_labels = []
-        # # collect all labels in a list
-        # if os.path.exists('./dataset_statistics.csv'):
-        #     df_all = pd.read_csv('./dataset_statistics.csv')
-        # else:
-        #     for x, y in all_dataloader:
-        #         all_labels.extend(y.tolist())
-        #     df_all = pd.DataFrame(all_labels, columns=['label'])
-        #     target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
-        #     df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
-        #     # save the dataset statistics
-        #     df_all.to_csv('./dataset_statistics.csv', index=False)
-        # # sns.set(style="darkgrid")
-        # ax = sns.countplot(x="label_name", data=df_all)
-        # ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
-        # ax.set_ylabel('Number of instances')
-
+        # logging.info("===> Plotting one grad CAM")
+        # ax, fig = plot_one_grad_cam(model, dataloader=test_dataloader, target_mode=target_mode, index=10)
+        # plt.show()
+        #
+        # return
+        logging.info('dataset statistics')
+        all_dataloader = get_dataloaders(config, batch=16, mode='all')
+        all_labels = []
+        # collect all labels in a list
+        if os.path.exists('./dataset_statistics.csv'):
+            df_all = pd.read_csv('./dataset_statistics.csv')
+        else:
+            for x, y in all_dataloader:
+                all_labels.extend(y.tolist())
+            df_all = pd.DataFrame(all_labels, columns=['label'])
+            target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
+            df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
+            # save the dataset statistics
+            df_all.to_csv('./dataset_statistics.csv', index=False)
+        # sns.set(style="darkgrid")
+        ax = sns.countplot(x="label_name", data=df_all)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
+        ax.set_ylabel('Number of instances')
         # plt.show()
         logging.info('Running evaluations Train and test (in that order).')
         evaluator.run(train_dataloader)
@@ -185,11 +189,6 @@ if __name__ == "__main__":
     #main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # main(target_mode='segmentation',  epochs=100, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
     # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
-    # PATH = "/media/doom/GG2/skin-project/models_1/skin/best_models"
-    # PATH = "/mediaA/doom/GG2/skin-project/models_2/best_models"
-    # PATH = "/media/doom/GG2/skin-project/models_3/best_models"
-    # PATH = "/home/doom/Documents/Phd/code/skinbot/best_models"
-    # PATH = "/media/doom/GG2/skin-project/models_4/best_models"
     # files = os.listdir(PATH)
     # accuracies = {f: 0 for f in files}
     # for f in files: #os.listdir(PATH):
@@ -222,16 +221,20 @@ if __name__ == "__main__":
 
     ## load model path
     # model = get_model("asd")
-    # model_path = 'best_models/best_fold=0_resnet101_number_model_0_accuracy=0.9333.pt'
     # if model_path is not None:
     #     model.load_state_dict(torch.load(model_path)['model'])
     #     logging.info('loaded model', model_path)
 
     # evaluate models:
-    # model_path = "/media/doom/GG2/skin-project/models_4_last_CNN_models/best_models/best_fold=0_resnet101_cropSingle_all_model_101_accuracy=0.7501.pt"
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001,
     #      model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=model_path)
 
     # training detection
-    main(target_mode='detection',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='fastermobilenet',
-         freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    # main(target_mode='detection',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='maskrcnn',
+    #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+
+    # training of autoencoders
+    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='ae',
+         freeze='No', optimizer='ADAM', only_eval=False)
+
+    print('this is created from the browser :)')
