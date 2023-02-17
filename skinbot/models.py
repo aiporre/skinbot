@@ -5,8 +5,10 @@ import torch.nn as nn
 from torchvision import datasets, models, transforms
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
+
 from skinbot.config import Config
 from skinbot.segmentation import UNet
+from skinbot.autoencoders import VariationalAutoEncoder, AutoEncoder
 
 C = Config()
 
@@ -165,6 +167,39 @@ def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=
     model = UNet(in_channels=3, num_classes=num_classes, learnable_upsample=learnable_upsample)
     return model
 
+def autoencoder_model(model_name, num_classes, freeze='No'):
+    num_inputs = eval(C['AUTOENCODER']['num_inputs'])
+    num_outputs = eval(C['AUTOENCODER']['num_outputs'])
+    latent_dims = int(C['AUTOENCODER']['latent_dims'])
+    assert len(num_inputs) == len(num_outputs) and len(num_inputs) < 4,\
+        f'Wrong config.ini. Num_inputs must be the same a num_outputs. And max only three. Given {num_inputs}'
+    # infers if convolutional activativate
+    convolutional = len(num_inputs) == 3 or len(num_inputs) == 2
+
+
+    if convolutional:
+        raise ValueError(f'Convolution autoencode not implemented yet')
+        # if model_name == 'ae':
+        #     model = AutoEncoder(in_channels=1, num_classes=num_classes, conditional=False)
+        # elif model_name == 'vae':
+        #     model = AutoEncoder(in_channels=3, num_classes=num_classes, conditional=False)
+        # elif model_name == 'cae':
+        #     model = VariationalAutoEncoder(in_channels=3, num_classes=num_classes, conditional=True)
+        # else:
+        #     # model_name is then CVAE
+        #     model = VariationalAutoEncoder(in_channels=3, num_classes=num_classes, conditional=True)
+    else:
+        if model_name == 'ae':
+            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims)
+        elif model_name == 'vae':
+            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims)
+        elif model_name == 'cae':
+            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes, latent_dims=latent_dims)
+        else:
+            # model_name is then CVAE
+            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes, latent_dims=latent_dims)
+    return model
+
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', **kwargs):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
@@ -173,6 +208,8 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', *
         model = detection_model(model_name, C.labels.num_classes)
     elif model_name == 'unet':
         model = segmentation_model(model_name, num_classes=C.labels.num_classes, freeze=freeze, **kwargs)
+    elif model_name in ['vae', 'ae', 'cae', 'cvae']:
+        model = autoencoder_model(model_name, num_classes=C.labels.num_classes, freeze=freeze, **kwargs)
     else:
         raise Exception(f"Model name {model_name} is not defined.")
     if optimizer is not None:
