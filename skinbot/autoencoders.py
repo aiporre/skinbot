@@ -31,23 +31,28 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.decoder_mlp = get_mlp(latent_dims, num_outputs, dropout=0, layers=layers)
 
-    def forward(self, z):
-        return self.decoder_mlp(z)
+    def forward(self, z, shape=None):
+        if shape is None:
+            return self.decoder_mlp(z)
+        else:
+            return torch.reshape(self.decoder_mlp(z), shape)
 class AutoEncoder(nn.Module):
-    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None):
+    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
         super(AutoEncoder, self).__init__()
-        if num_classes is not None:
+        if num_classes is None:
             self.encoder = Encoder(num_inputs, latent_dims, layers=layers)
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
+            self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = False
         else:
             self.encoder = Encoder(num_inputs, latent_dims, layers=layers)
-            self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
+            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = True
+        self.preserve_shape = preserve_shape
 
     def forward(self, x, y=None):
+        shape = x.shape if self.preserve_shape else None
         z = self.encoder(x, y=y)
-        return self.decoder(z)
+        return self.decoder(z, shape=shape)
 
 
 
@@ -75,19 +80,21 @@ class VariationalEncoder(nn.Module):
 
 
 class VariationalAutoEncoder(nn.Module):
-    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None):
+    def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
         super(VariationalAutoEncoder, self).__init__()
-        if num_classes is not None:
+        if num_classes is None:
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
+            self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = False
         else:
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
             self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = True
+        self.preserve_shape = preserve_shape
 
     def compute_kl(self):
         return self.encoder.kl
     def forward(self, x, y=None):
+        shape = x.shape if self.preserve_shape else None
         z = self.encoder(x, y=y)
-        return self.decoder(z)
+        return self.decoder(z, shape=shape)

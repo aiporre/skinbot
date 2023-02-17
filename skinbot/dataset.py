@@ -16,7 +16,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.io import read_image
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
-    DetectionTarget, DetectionPretrained, PretrainedSegmentation
+    DetectionTarget, DetectionPretrained, PretrainedSegmentation, PretrainedMNIST, TargeOneHotfromNum
 
 from skinbot.config import Config, LabelConstantsDetection
 from torchvision.transforms.functional import rotate
@@ -745,23 +745,23 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
     labels_config = config['DATASET']['labels']
     fuzzy_labels = False
     _crop_lesion = True
-    target_transform = TargetValue()
+    target_transform =  TargeOneHotfromNum()
     if labels_config.lower() == 'mnist':
         DatasetClass = MNIST
     else:
         DatasetClass = WoundImages
     if mode == "all":
-        transform = Pretrained(test=True)
+        transform = PretrainedMNIST(test=True)
         wound_images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = Pretrained(test=True)
+        transform = PretrainedMNIST(test=True)
         wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
                                     transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
-        transform = Pretrained(test=False)
+        transform = PretrainedMNIST(test=False)
         wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
                                     transform=transform, target_transform=target_transform)
         shuffle_dataset = True
@@ -777,10 +777,10 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
 
     valid_targets = ['onehot', 'single', 'string', 'fuzzy', 'multiple',
                      'detection',
-                     'reconstruction'
+                     'reconstruction',
                      'maskSingle',
                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation']
-    assert target in valid_targets, f"valid options to target mode are {valid_targets}"
+    assert target in valid_targets, f"Given {target}. Valid options to target mode are {valid_targets}"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
     fuzzy_labels = False

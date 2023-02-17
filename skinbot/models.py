@@ -181,11 +181,23 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
     num_inputs = eval(C.config['AUTOENCODER']['num_inputs'])
     num_outputs = eval(C.config['AUTOENCODER']['num_outputs'])
     latent_dims = int(C.config['AUTOENCODER']['latent_dims'])
-    layers = eval(C['AUTOENCODER']['layers'])
-    assert len(num_inputs) == len(num_outputs) and len(num_inputs) < 4, \
-        f'Wrong config.ini. Num_inputs must be the same a num_outputs. And max only three. Given {num_inputs}'
-    # infers if convolutional activativate
-    convolutional = len(num_inputs) == 3 or len(num_inputs) == 2
+    layers = eval(C.config['AUTOENCODER']['layers'])
+    preserve_shape = bool(C.config['AUTOENCODER']['preserve_shape'])
+    if isinstance(num_inputs, (list, tuple)) and isinstance(num_outputs, (list, tuple)):
+        assert len(num_inputs) == len(num_outputs) and len(num_inputs) < 4, \
+        f'Wrong config.ini. Num_inputs must be the same a num_outputs.' \
+        f' And max only three. Given  inputs {num_inputs},' \
+        f'and outputs {num_outputs}'
+        convolutional = True
+    elif isinstance(num_inputs, int) and isinstance(num_outputs, int):
+        assert num_inputs == num_outputs, \
+            f'Wrong config.ini. Num_inputs must be the same a num_outputs. ' \
+            f'And max only three. Given inputs {num_inputs}' \
+            f'and outputs {num_outputs}'
+        convolutional = False
+    else:
+        raise ValueError(f'Wrong inp[uts in the config.ini num_inputs na num_outs, try same int int or tuple tuple or list list')
+        # infers if convolutional activativate
 
     if convolutional:
         raise ValueError(f'Convolution autoencode not implemented yet')
@@ -200,17 +212,18 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
         #     model = VariationalAutoEncoder(in_channels=3, num_classes=num_classes, conditional=True)
     else:
         if model_name == 'ae':
-            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers)
+            model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers,
+                                preserve_shape=preserve_shape)
         elif model_name == 'vae':
             model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims,
-                                           layers=layers)
+                                           layers=layers, preserve_shape=preserve_shape)
         elif model_name == 'cae':
             model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes,
-                                latent_dims=latent_dims, layers=layers)
+                                latent_dims=latent_dims, layers=layers, preserve_shape=preserve_shape)
         else:
             # model_name is then CVAE
             model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes,
-                                           latent_dims=latent_dims, layers=layers)
+                                           latent_dims=latent_dims, layers=layers, preserve_shape=preserve_shape)
     return model
 
 

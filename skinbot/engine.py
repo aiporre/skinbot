@@ -145,7 +145,10 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         # make a prediction reconstruction of vector x
         x_hat = model(x, y=y) if model.conditional else model(x)
         engine.state.optimizer.zero_grad()
-        loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
+        if hasattr(model, 'compute_kl'):
+            loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
+        else:
+            loss = ((x - x_hat) ** 2).sum()
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()
@@ -153,7 +156,7 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         if hasattr(engine.state, 'warmup_scheduler') and engine.state.warmup_scheduler is not None:
             engine.state.warmup_scheduler.step()
 
-        return x, y, loss_value
+        return loss_value
 
     engine = Engine(update_model)
     engine.state.optimizer = optimizer
@@ -170,9 +173,9 @@ def create_autoencoder_evaluator(model, device=None):
         # start evaluation
         with torch.no_grad():
             x_hat = model(x, y=y) if model.conditional else model(x)
-            engine.state.metrics['mse'] = ((x_hat - x) ** 2).mean()
-            engine.state.metrics['mae'] = (torch.absolute(x_hat - x)).mean()
-            engine.state.metrics['kl'] = model.compute_kl()
+            engine.state.metrics['mse'] = ((x_hat - x) ** 2).mean().cpu().item()
+            engine.state.metrics['mae'] = (torch.absolute(x_hat - x)).mean().cpu().item()
+            engine.state.metrics['kl'] = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else 0
         return x, y
 
     return Engine(update_model)
@@ -985,7 +988,7 @@ def configure_engines(target_mode, *args, **kwargs):
         return configure_engines_detection(target_mode, *args, **kwargs)
     elif 'segmentation' in target_mode.lower():
         return configure_engines_segmentation(target_mode, *args, **kwargs)
-    elif target_mode.lower() in ['vae', 'ae', 'cvae', 'cae']:
+    elif target_mode.lower() == 'reconstruction':
         return configure_engines_autoencoder(target_mode, *args, **kwargs)
     else:
         return configure_engines_classification(target_mode, *args, **kwargs)
