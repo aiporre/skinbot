@@ -12,7 +12,7 @@ from skinbot.dataset import get_dataloaders
 from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator, get_best_iteration, create_segmentation_trainer, \
-    create_segmentation_evaluator
+    create_segmentation_evaluator, create_autoencoder_trainer, create_autoencoder_evaluator
 from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam
 from skinbot.models import get_model
 import skinbot.skinlogging as logging
@@ -88,6 +88,9 @@ def main(best_or_last='best',
     elif 'segmentation' in target_mode:
         trainer = create_segmentation_trainer(model, optimizer, device=device)
         evaluator = create_segmentation_evaluator(model, device=device)
+    elif 'reconstruction' == target_mode.lower():
+        trainer = create_autoencoder_trainer(model, optimizer, device=device)
+        evaluator = create_autoencoder_evaluator(model, device=device)
     else:
         trainer, criterion = create_classification_trainer(model, optimizer, target_mode, device=device)
         evaluator = create_classification_evaluator(model, criterion, target_mode, device=device)
