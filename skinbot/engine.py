@@ -143,7 +143,7 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         if torch.has_cuda:
             torch.cuda.synchronize()
         # make a prediction reconstruction of vector x
-        x_hat = model(x, y=y)
+        x_hat = model(x, y=y) if model.conditional else model(x)
         engine.state.optimizer.zero_grad()
         loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
         loss.backward()
@@ -169,7 +169,7 @@ def create_autoencoder_evaluator(model, device=None):
             torch.cuda.synchronize()
         # start evaluation
         with torch.no_grad():
-            x_hat = model(x, y=y)
+            x_hat = model(x, y=y) if model.conditional else model(x)
             engine.state.metrics['mse'] = ((x_hat - x) ** 2).mean()
             engine.state.metrics['mae'] = (torch.absolute(x_hat - x)).mean()
             engine.state.metrics['kl'] = model.compute_kl()
