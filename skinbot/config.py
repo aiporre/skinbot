@@ -135,7 +135,38 @@ class LabelConstantsDetection:
 
     num_classes = len(target_str_to_num)
 
+class LabelConstantsMNIST:
+    target_str_to_num = {
+        '0': 0,
+        '1': 1,
+        '2': 2,
+        '3': 2,
+        '4': 2,
+        '5': 2,
+        '6': 6,
+        '7': 7,
+        '8': 8,
+        '9': 9
+    }
 
+    target_weights = {
+        '0': 1,
+        '1': 1,
+        '2': 1,
+        '3': 1,
+        '4': 1,
+        '5': 1,
+        '6': 1,
+        '7': 1,
+        '8': 1,
+        '9': 1
+    }
+
+    fixed_error_labels = {
+        'dummy': 'blue'
+    }
+
+    num_classes = len(target_str_to_num)
 def read_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config.read(config_file)
@@ -163,6 +194,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelSegmentation
         elif config['DATASET']['labels'].lower() == 'detection':
             self.labels = LabelConstantsDetection
+        elif config['DATASET']['labels'].lower() == 'mnist':
+            self.labels = LabelConstantsMNIST
         else:
             raise Exception('Dataset configuration not found.')
 

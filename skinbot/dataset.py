@@ -777,6 +777,7 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
 
     valid_targets = ['onehot', 'single', 'string', 'fuzzy', 'multiple',
                      'detection',
+                     'reconstruction'
                      'maskSingle',
                      'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation']
     assert target in valid_targets, f"valid options to target mode are {valid_targets}"
@@ -822,9 +823,9 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     elif target.lower() == 'segmentation':
         return get_dataloaders_segmentation(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     elif target.lower() == 'masksingle':  # TODO: maybe replace with startswith('mask')
-        return get_dataloaders_reconstruction(config, batch, mode=mode, fold_iteration=fold_iteration)
-    elif target.lower() == 'reconstruction':
         return get_dataloaders_mask(config, batch, mode=mode, fold_iteration=fold_iteration)
+    elif target.lower() == 'reconstruction':
+        return get_dataloaders_reconstruction(config, batch, mode=mode, fold_iteration=fold_iteration)
     else:
         raise ValueError(f"Invalid target {target}")
 
