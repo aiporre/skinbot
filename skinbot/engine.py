@@ -365,9 +365,11 @@ def configure_engines_classification(target_mode,
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
 
+    # log_interval =1 
+
     # @trainer.on(Events.ITERATION_COMPLETED(every=log_interval))
     # def log_training_loss(trainer):
-    # print(f"Epoch[{trainer.state.epoch}] Loss: {trainer.state.output:.2f}")
+    #     print(f"Epoch[{trainer.state.epoch}] Loss: {trainer.state.output:.2f}")
 
     @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_training_results(engine):
