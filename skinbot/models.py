@@ -168,9 +168,9 @@ def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=
     return model
 
 def autoencoder_model(model_name, num_classes, freeze='No'):
-    num_inputs = eval(C['AUTOENCODER']['num_inputs'])
-    num_outputs = eval(C['AUTOENCODER']['num_outputs'])
-    latent_dims = int(C['AUTOENCODER']['latent_dims'])
+    num_inputs = eval(C.config['AUTOENCODER']['num_inputs'])
+    num_outputs = eval(C.config['AUTOENCODER']['num_outputs'])
+    latent_dims = int(C.config['AUTOENCODER']['latent_dims'])
     layers = eval(C['AUTOENCODER']['layers'])
     assert len(num_inputs) == len(num_outputs) and len(num_inputs) < 4,\
         f'Wrong config.ini. Num_inputs must be the same a num_outputs. And max only three. Given {num_inputs}'

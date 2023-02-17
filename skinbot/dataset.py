@@ -20,6 +20,7 @@ from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTar
 
 from skinbot.config import Config, LabelConstantsDetection
 from torchvision.transforms.functional import rotate
+from torchvision.datasets import MNIST as _MNIST
 
 from skinbot.utils import get_image_rotation
 
@@ -91,6 +92,29 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super(NpEncoder, self).default(obj)
+
+
+class MNIST(Dataset):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=5,
+                 test=False,
+                 crop_lesion=False,
+                 fuzzy_labels=False,
+                 detection=False,
+                 transform=None,
+                 target_transform=None):
+        # orchvision.datasets.MNIST(root: str, train: bool = True, transform: Optional[Callable] = None,
+        # target_transform: Optional[Callable] = None, download: bool = False)
+        assert os.path.exists(root_dir), 'root directoyr must exist %s' % root_dir
+        self._dataset = _MNIST(root=root_dir, train=~test, transform=transform,
+                               target_transform=target_transform, download=True)
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, index):
+        return self._dataset[index]
 
 
 class WoundImages(Dataset):
@@ -354,8 +378,8 @@ class WoundMaskedImages(WoundImages):
         for _id in ids:
             mask[mask == _id] = 1
 
-
-        assert torch.max(mask).item() == 1, f'Mask for image {self.image_fnames[index]} has incorrect labels {torch.unique(mask)}'
+        assert torch.max(
+            mask).item() == 1, f'Mask for image {self.image_fnames[index]} has incorrect labels {torch.unique(mask)}'
 
         return mask
 
@@ -445,14 +469,14 @@ class WoundColors(WoundImages):
                  crop_lesion=False,
                  fuzzy_labels=False):
         super(WoundColors, self).__init__(root_dir,
-                                                   fold_iteration=fold_iteration,
-                                                   cross_validation_folds=cross_validation_folds,
-                                                   test=test,
-                                                   crop_lesion=crop_lesion,
-                                                   fuzzy_labels=fuzzy_labels,
-                                                   detection=True,
-                                                   transform=transform,
-                                                   target_transform=target_transform)
+                                          fold_iteration=fold_iteration,
+                                          cross_validation_folds=cross_validation_folds,
+                                          test=test,
+                                          crop_lesion=crop_lesion,
+                                          fuzzy_labels=fuzzy_labels,
+                                          detection=True,
+                                          transform=transform,
+                                          target_transform=target_transform)
         if not fuzzy_labels:
             self.fuzzy_labels = None
 
@@ -495,6 +519,7 @@ class WoundColors(WoundImages):
         if self.target_transform:
             label = self.target_transform(label)
         return image, label
+
 
 class WoundSegmentationImages(WoundImages):
     def __init__(self, root_dir,
@@ -715,6 +740,38 @@ def get_dataloaders_mask(config, batch, mode='all', fold_iteration=0):
     return dataloader
 
 
+def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
+    root_dir = config['DATASET']['root']
+    labels_config = config['DATASET']['labels']
+    fuzzy_labels = False
+    _crop_lesion = True
+    target_transform = TargetValue()
+    if labels_config.lower() == 'mnist':
+        DatasetClass = MNIST
+    else:
+        DatasetClass = WoundImages
+    if mode == "all":
+        transform = Pretrained(test=True)
+        wound_images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
+        shuffle_dataset = False
+    elif mode == 'test':
+        transform = Pretrained(test=True)
+        wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
+                                    transform=transform, target_transform=target_transform)
+
+        shuffle_dataset = False
+    elif mode == 'train':
+        transform = Pretrained(test=False)
+        wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
+                                    transform=transform, target_transform=target_transform)
+        shuffle_dataset = True
+
+    # wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, num_workers=4)
+
+    return dataloader
+
+
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
 
@@ -765,6 +822,8 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
     elif target.lower() == 'segmentation':
         return get_dataloaders_segmentation(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     elif target.lower() == 'masksingle':  # TODO: maybe replace with startswith('mask')
+        return get_dataloaders_reconstruction(config, batch, mode=mode, fold_iteration=fold_iteration)
+    elif target.lower() == 'reconstruction':
         return get_dataloaders_mask(config, batch, mode=mode, fold_iteration=fold_iteration)
     else:
         raise ValueError(f"Invalid target {target}")
