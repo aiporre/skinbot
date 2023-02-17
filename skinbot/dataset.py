@@ -435,6 +435,67 @@ class WoundDetectionImages(WoundImages):
         return image, label
 
 
+class WoundColors(WoundImages):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=4,
+                 test=False,
+                 transform=None,
+                 target_transform=None,
+                 crop_lesion=False,
+                 fuzzy_labels=False):
+        super(WoundColors, self).__init__(root_dir,
+                                                   fold_iteration=fold_iteration,
+                                                   cross_validation_folds=cross_validation_folds,
+                                                   test=test,
+                                                   crop_lesion=crop_lesion,
+                                                   fuzzy_labels=fuzzy_labels,
+                                                   detection=True,
+                                                   transform=transform,
+                                                   target_transform=target_transform)
+        if not fuzzy_labels:
+            self.fuzzy_labels = None
+
+    def __getitem__(self, index):
+        # read image and convert ot floay by diviing by 1.0
+        image_path = os.path.join(self.images_dir, self.image_fnames[index])
+        try:
+            image = read_image(image_path) / 1.0
+            rotation = get_image_rotation(image_path)
+            if rotation is not None:
+                # then rotate the image
+                image = rotate(image, angle=rotation, expand=True)
+        except Exception as e:
+            logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
+            raise e
+        # get the two optinos of labels fuzzy or single
+        if self.fuzzy_labels is None:
+            label = self.image_fnames[index].split("_")[0]
+        else:
+            label = self.fuzzy_labels[index]
+
+        # apply crop if required (AKA always required!!) :) othwise black?
+        if self.crop_lesion:
+            # It uses the detection label if it was created before, otherwise it creates a new one
+            if not self.image_fnames[index] in self._crop_boxes:
+                _label = self._make_one_detection_label({}, index)
+                boxes = _label['boxes'][_label['labels'] == LabelConstantsDetection.target_str_to_num['lesion']]
+                self._crop_boxes[self.image_fnames[index]] = boxes
+            else:
+                # used the saved crop coordinates if they are in the dictionary self._crop_boxes[...]
+                boxes = self._crop_boxes[self.image_fnames[index]]
+            image = crop_lesion(image, boxes)
+
+        # compute color vector:
+        from skinbot.colors import get_dominant_color
+        image = torch.Tensor(get_dominant_color(image.cpu().numpy())).float()
+
+        if self.transform and not self.create_detection:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
+
 class WoundSegmentationImages(WoundImages):
     def __init__(self, root_dir,
                  fold_iteration=None,
