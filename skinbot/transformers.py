@@ -42,25 +42,38 @@ class ToFloat:
         else:
             raise ValueError(f'Input x is type {type(x)} not supported. Valids are torch.Tensor and numpy.ndarray')
 
+class ToLong:
+    def __call__(self, x):
+        if isinstance(x, torch.Tensor):
+            return x.long()
+        elif isinstance(x, np.ndarray):
+            return x.astype(np.int32)
+        else:
+            raise ValueError(f'Input x is type {type(x)} not supported. Valids are torch.Tensor and numpy.ndarray')
+
 class Pretrained:
     def __init__(self, test=False, input_size=224):
         self.test = test
         self.T = {
             'train': transforms.Compose([
-                    transforms.RandomResizedCrop(input_size),
+                    # transforms.Resize(input_size),
+                    # transforms.CenterCrop(input_size),
+                    # ToLong(),
+                    # transforms.ColorJitter(brightness=0.5, hue=0.3),
+                    transforms.RandomResizedCrop(input_size, scale=(0.8,0.8)),
                     transforms.RandomHorizontalFlip(),
                     transforms.RandomVerticalFlip(),
                     transforms.RandomRotation(90),
                     #transforms.ToTensor(),
                     ToFloat(),
-                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    #transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                 ]),
             'val': transforms.Compose([
                     transforms.Resize(input_size),
                     transforms.CenterCrop(input_size),
                     # transforms.ToTensor(),
                     ToFloat(),
-                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    #transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                 ])
         }
     def __call__(self, x):
