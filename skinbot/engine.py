@@ -14,7 +14,7 @@ from ignite.engine import EventEnum
 from torch import distributed as dist
 import numpy as np
 
-from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss
+from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss, FocalLoss
 # from skinbot.transformers import num_classes, target_weights
 from skinbot.utils import validate_target_mode, get_log_path, make_patches, join_patches, load_models
 from skinbot.config import Config
@@ -320,7 +320,7 @@ def create_classification_trainer(model, optimizer, target_mode, device=None):
         v_max = max(C.labels.target_weights.values())
         target_values_norm = [v_max / v for v in C.labels.target_weights.values()]
         target_weights_tensor = torch.tensor(target_values_norm, dtype=torch.float32, device=device)
-        criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
+        criterion = FocalLoss() # torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
     elif 'multiple' in target_mode.lower():
         criterion = MulticlassLoss()
     elif 'fuzzy' in target_mode.lower():
