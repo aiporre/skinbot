@@ -242,16 +242,16 @@ class WoundImages(Dataset):
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
 
-            analyse_mask(mask, lesion_ids, C.labels.target_str_to_num['lesion'])
+            analyse_mask(mask, lesion_ids, LabelConstantsDetection.target_str_to_num['lesion'])
             skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
             skin_ids.pop('blandSkin', None)
-            analyse_mask(mask, skin_ids, C.labels.target_str_to_num['lesion'])
+            analyse_mask(mask, skin_ids, LabelConstantsDetection.target_str_to_num['lesion'])
 
             if len(boxes) == 0:
-                logging.warning(f'Warning: No lesions found in image {self.image_fnames[index]}')
+                logging.warn(f'Warning: No lesions found in image {self.image_fnames[index]}')
             # getting the scale mask from the image
             scale_id = {"scale": 13}
-            analyse_mask(mask, scale_id, C.labels.target_str_to_num['scale'])
+            analyse_mask(mask, scale_id, LabelConstantsDetection.target_str_to_num['scale'])
             # save mask in npy file
             np.save(detection_npy_path, np.array(masks))
             # other info in json file
