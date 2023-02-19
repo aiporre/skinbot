@@ -198,10 +198,16 @@ def get_random_sample_from_class(where_dict, source, label):
         return None
 
 def swap_samples(where_dict, index_A, index_B):
-    where_dict.at[index_A, 'new_path'] = where_dict.at[index_B, 'original_path']
-    where_dict.at[index_B, 'new_path'] = where_dict.at[index_A, 'original_path']
-    where_dict.at[index_A, 'source'] = 'B'
-    where_dict.at[index_B, 'source'] = 'A'
+    # where_dict.at[index_A, 'new_path'] = where_dict.at[index_B, 'original_path']
+    # where_dict.at[index_B, 'new_path'] = where_dict.at[index_A, 'original_path']
+    # where_dict.at[index_A, 'source'] = 'B'
+    # where_dict.at[index_B, 'source'] = 'A'
+    org_path_a= where_dict.at[index_A, 'original_path']
+    org_path_b = where_dict.at[index_B, 'original_path']   
+    dir_a, fname_a = os.path.split(org_path_a)
+    dir_b, fname_b = os.path.split(org_path_b)
+    where_dict = move_sample(where_dict, index_A, 'B', dir_a, dir_b)
+    where_dict = move_sample(where_dict, index_B, 'A', dir_b, dir_a)
     return where_dict
 
 
@@ -213,8 +219,22 @@ def move_sample(where_dict, index, source, org_path, dest_path):
     where_dict.at[index, 'source'] = source
     return where_dict
 
+def move_images(org_path, dest_path):
+    if os.path.exists(org_path):
+        shutil.move(org_path, dest_path)
+        if os.path.exists(dest_path) and not os.path.exists(org_path):
+            print('moved file!')
+        else:
+            print('failed moving file')
+    else:
+        print('Cannot move: ', org_path, ' Doesn\'t exists.')
+        
+
 config1 =  read_config('config.ini')
 config2 = read_config('config_external.ini')
+# config
+C.set_config(config1) 
+
 # create dictionaty
 where_dict = get_dataset_where(config1, config2)
 # {fname:"", path: "", "where": A or B}
@@ -226,21 +246,36 @@ source_a_path, source_b_path = get_images_paths(config1,config2)
 print('dataset stats before')
 with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
     print(dataset_stats)
-for l in dataset_stats['label']:
-    diff = get_desired_diff(dataset_stats, 'A', l)
-    print('diff for label ', l, ' is ', diff)
-    if diff > 0:
-        # move sample from B to A
-        for i in range(diff):
-            index = get_random_sample_from_class(where_dict, 'B', l)
-            if index is not None:
-                where_dict = move_sample(where_dict, index, 'A', source_b_path, source_a_path)
-    else:
-        # move sample from A to B
-        for i in range(abs(diff)):
-            index = get_random_sample_from_class(where_dict, 'A', l)
-            if index is not None:
-                where_dict = move_sample(where_dict, index, 'B', source_a_path, source_b_path)
+# for l in dataset_stats['label']:
+#     diff = get_desired_diff(dataset_stats, 'A', l)
+#     print('diff for label ', l, ' is ', diff)
+#     if diff > 0:
+#         # move sample from B to A
+#         for i in range(diff):
+#             index = get_random_sample_from_class(where_dict, 'B', l)
+#             if index is not None:
+#                 where_dict = move_sample(where_dict, index, 'A', source_b_path, source_a_path)
+#     else:
+#         # move sample from A to B
+#         for i in range(abs(diff)):
+#             index = get_random_sample_from_class(where_dict, 'A', l)
+#             if index is not None:
+#                 where_dict = move_sample(where_dict, index, 'B', source_a_path, source_b_path)
+
+while not (is_balanced(dataset_stats, source='B')):
+    # move samples around in the where_dict
+    # favor lowest support for B
+    label_candidate = get_lowest_label_support(where_dict, "B")
+    # print('label_cand=', label_candidate)
+    sample_candidate_A = get_random_sample_from_class(where_dict, "A", label_candidate)
+    label_candidate = get_highest_label_support(where_dict, "B")
+    sample_candidate_B = get_random_sample_from_class(where_dict, "B", label_candidate)
+    # print('sample-canA = ', sample_candidate_A)
+    # print('sample-canB = ', sample_candidate_B)
+    where_dict = swap_samples(where_dict, sample_candidate_A, sample_candidate_B)
+    dataset_stats = get_dataset_stats(where_dict)
+    # repeat the same with A
+print(dataset_stats)
 
 print('dataset_stats after: ')
 dataset_stats = get_dataset_stats(where_dict)
@@ -261,16 +296,20 @@ where_dict.to_csv('where.csv', index=False)
 #         p2_color_mask = p2.replace('.jpg', '_color_mask.png').replace('.JPG', '_color_mask.png')
 #         p1_watershed_mask = p1.replace('.jpg', '_watershed_mask.png').replace('.JPG', '_watershed_mask.png')
 #         p2_watershed_mask = p2.replace('.jpg', '_watershed_mask.png').replace('.JPG', '_watershed_mask.png')
-#         break
-#         shutil.move(p1, p2)
+#         # break
+#         #shutil.move(p1, p2)
 #         print('move', p1, ' to ', p2)
-#         shutil.move(p1_mask, p2_mask)
+#         move_images(p1,p2)
+#         # shutil.move(p1_mask, p2_mask)
 #         print('move', p1_mask, ' to ', p2_mask)
-#         shutil.move(p1_color_mask, p2_color_mask)
+#         move_images(p1_mask, p2_mask)
+#         # shutil.move(p1_color_mask, p2_color_mask)
 #         print('move', p1_color_mask, ' to ', p2_color_mask)
-#         shutil.move(p1_watershed_mask, p2_watershed_mask)
+#         move_images(p1_color_mask, p2_color_mask)
+#         # shutil.move(p1_watershed_mask, p2_watershed_mask)
 #         print('move', p1_watershed_mask, ' to ', p2_watershed_mask)
-
+#         move_images(p1_watershed_mask, p2_watershed_mask)
+# 
 # while not (is_balanced(dataset_stats, source='B')):
 #     # move samples around in the where_dict
 #     # favor lowest support for B
