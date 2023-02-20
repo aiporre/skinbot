@@ -164,6 +164,20 @@ def create_autoencoder_trainer(model, optimizer, device=None):
 
 
 def create_autoencoder_evaluator(model, device=None):
+
+    class MSE:
+        def __call__(self, x_hat, x, **kwargs):
+            return ((x_hat - x) ** 2).mean()
+
+    class MAE:
+        def __call__(self, x_hat, x, **kwargs):
+            return (torch.absolute(x_hat - x)).mean()
+
+    class KL:
+        def __call__(self, x_hat, x, **kwargs):
+            return kwargs['kl']
+
+
     def update_model(engine, batch):
         model.eval()
         x, y = ae_prepare_batch(batch, device=device)
@@ -173,12 +187,20 @@ def create_autoencoder_evaluator(model, device=None):
         # start evaluation
         with torch.no_grad():
             x_hat = model(x, y=y) if model.conditional else model(x)
-            engine.state.metrics['mse'] = ((x_hat - x) ** 2).mean().cpu().item()
-            engine.state.metrics['mae'] = (torch.absolute(x_hat - x)).mean().cpu().item()
-            engine.state.metrics['kl'] = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else 0
-        return x, y
+            kl = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
+        return x_hat, x, {'kl': kl}
 
-    return Engine(update_model)
+    evaluator = Engine(update_model)
+    
+    val_metrics = {
+        'mae': Loss(MAE()),
+        'mse': Loss(MSE()),
+        'kl': Loss(KL())
+    }
+    for name, metric in val_metrics.items():
+        metric.attach(evaluator, name)
+
+    return evaluator 
 
 
 def create_detection_trainer(model, optimizer, device=None):
@@ -553,7 +575,7 @@ def configure_engines_autoencoder(target_mode,
 
     @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_training_results(engine):
-        logging.info('Running training evaluation (detection): ')
+        logging.info('Evaluation of training set .... ')
         evaluator.run(train_dataloader)
 
         metrics = evaluator.state.metrics
@@ -562,20 +584,20 @@ def configure_engines_autoencoder(target_mode,
         kl = metrics['kl']
         logging.info(f"TRAINING RESULTS: \n"
                      f"Training Results - Epoch: {engine.state.epoch} " 
-                     f"MSE: {mse:.2f}" 
-                     f"MAE: {mae:.2f}"
-                     f"KL: {kl:.2f}")
+                     f"MSE: {mse:.2f} " 
+                     f"MAE: {mae:.2f} "
+                     f"KL: {kl:.2f} ")
 
     @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_validation_results(engine):
-        logging.info("Running validation evaluation (detection)...")
+        logging.info("Evaluation of testing set ...")
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
         mse = metrics["mse"]
         mae = metrics["mae"]
         kl = metrics['kl']
-        logging.info(f"TRAINING RESULTS: \n"
-                     f"Training Results - Epoch: {engine.state.epoch} "
+        logging.info(f"TESTING RESULTS: \n"
+                     f"testing Results - Epoch: {engine.state.epoch} "
                      f"MSE: {mse:.2f}"
                      f"MAE: {mae:.2f}"
                      f"KL: {kl:.2f}")
