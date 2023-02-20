@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 
+import skinbot.skinlogging as logging
+from skinbot.utils_models import get_backbone
+
+
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
     layers = [1024] if layers is None else layers
     instances = []
@@ -98,3 +102,39 @@ class VariationalAutoEncoder(nn.Module):
         shape = x.shape if self.preserve_shape else None
         z = self.encoder(x, y=y)
         return self.decoder(z, shape=shape)
+
+class ConvolutionalAutoEncoder(nn.Module):
+
+    # def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
+    def __init__(self, input_size,
+                 num_inputs,
+                 num_outputs,
+                 latent_dims,
+                 num_classes=None,
+                 layers=None,
+                 preserve_shape=False,
+                 varational=False,
+                 reconstruct_image_features=False):
+
+        self.backbone = get_backbone('resnet50', None, freeze='Yes', conv_only=True)
+        num_features_backbone = self.backbone.num_features
+        if varational:
+            self.autoencoder = AutoEncoder(num_inputs=num_features_backbone,
+                                           num_outputs=num_outputs,
+                                           latent_dims=latent_dims,
+                                           num_classes=num_classes,
+                                           layers=layers,
+                                           preserve_shape=preserve_shape)
+        else:
+            self.autoencoder = VariationalAutoEncoder(
+                                       num_inputs=num_features_backbone,
+                                       num_outputs=num_outputs,
+                                       latent_dims=latent_dims,
+                                       num_classes=num_classes,
+                                       layers=layers,
+                                       preserve_shape=preserve_shape)
+
+        if not reconstruct_image_features:
+            # needs a reconstruction of original input image.
+            # self.deconvolution = Deconvolution(num_inputs, output_size=input_size)
+            raise Exception("Not implemente decovntion to reconsvtruio image")
