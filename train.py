@@ -112,75 +112,80 @@ def main(best_or_last='best',
         # plt.show()
         #
         # return
-        logging.info('dataset statistics')
-        all_dataloader = get_dataloaders(config, batch=16, mode='all')
-        all_labels = []
-        # collect all labels in a list
-        if os.path.exists('./dataset_statistics.csv'):
-            df_all = pd.read_csv('./dataset_statistics.csv')
+        if 'single' in target_mode or 'multiple' in target_mode or 'fuzzy' in target_mode:
+            return evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name,
+                                                     model_path, target_mode, test_dataloader, train_dataloader)
         else:
-            for x, y in all_dataloader:
-                all_labels.extend(y.tolist())
-            df_all = pd.DataFrame(all_labels, columns=['label'])
-            target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
-            df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
-            # save the dataset statistics
-            df_all.to_csv('./dataset_statistics.csv', index=False)
-        # sns.set(style="darkgrid")
-        ax = sns.countplot(x="label_name", data=df_all)
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
-        ax.set_ylabel('Number of instances')
-        # plt.show()
-        logging.info('Running evaluations Train and test (in that order).')
-        evaluator.run(train_dataloader)
-        logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
-        evaluator.run(test_dataloader)
-        logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
-        _fold = fold if not external_data else 'external'
-        predictions_fname = f'./predictions_fold={_fold}_{model_name}_{target_mode}.csv'
+            raise Exception(f"Target mode = {target_mode} doen't have an evalution action.")
 
-        if False:  # os.path.exists(predictions_fname):
-            df = pd.read_csv(predictions_fname)
+
+def evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name, model_path,
+                                      target_mode, test_dataloader, train_dataloader):
+    logging.info('dataset statistics')
+    all_dataloader = get_dataloaders(config, batch=16, mode='all')
+    all_labels = []
+    # collect all labels in a list
+    if os.path.exists('./dataset_statistics.csv'):
+        df_all = pd.read_csv('./dataset_statistics.csv')
+    else:
+        for x, y in all_dataloader:
+            all_labels.extend(y.tolist())
+        df_all = pd.DataFrame(all_labels, columns=['label'])
+        target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
+        df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
+        # save the dataset statistics
+        df_all.to_csv('./dataset_statistics.csv', index=False)
+    # sns.set(style="darkgrid")
+    ax = sns.countplot(x="label_name", data=df_all)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
+    ax.set_ylabel('Number of instances')
+    # plt.show()
+    logging.info('Running evaluations Train and test (in that order).')
+    evaluator.run(train_dataloader)
+    logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
+    evaluator.run(test_dataloader)
+    logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
+    _fold = fold if not external_data else 'external'
+    predictions_fname = f'./predictions_fold={_fold}_{model_name}_{target_mode}.csv'
+    if False:  # os.path.exists(predictions_fname):
+        df = pd.read_csv(predictions_fname)
+    else:
+        # best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+        # best_model_path = os.path.join('best_models', best_model_path)
+        # model.load_state_dict(torch.load(best_model_path))
+        if model_path is not None:
+            model.load_state_dict(torch.load(model_path))
+            logging.info('model loaded: ', model_path)
         else:
-            # best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
-            # best_model_path = os.path.join('best_models', best_model_path)
-            # model.load_state_dict(torch.load(best_model_path))
-            if model_path is not None:
-                model.load_state_dict(torch.load(model_path))
-                logging.info('model loaded: ', model_path)
-            else:
-                best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
-                if best_model_path is not None:
-                    best_model_path = os.path.join('best_models', best_model_path)
-                    model.load_state_dict(torch.load(best_model_path))
-                    logging.info('best model loaded: ', model_path)
-            df = predict_samples(model, test_dataloader, fold, target_mode)
-            df.to_csv(predictions_fname, index=False)
-        logging.info(df.head())
-        logging.info('prediction_results.csv saved')
-        df = error_analysis(df)
-        # logging.info(f"prediction summary: {df['error'].describe()}")
-        accTotal = float(len(df)-df['error'].sum())/len(df)
-        logging.info(f' Prediction acc: {accTotal}')
-
-        class_names = list(C.labels.target_str_to_num.keys())
-        report = classification_report(df['y_true'], df['y_pred'], labels=range(len(class_names)),
-                                       target_names=class_names)
-        logging.info(report)
-
-        matrix = confusion_matrix(df['y_true'], df['y_pred'])
-        accuracies = matrix.diagonal() / matrix.sum(axis=1)
-        logging.info(' Accuracy per class:')
-        for acc, class_name in zip(accuracies, class_names):
-            logging.info(f'{class_name}: {acc}')
-
-        logging.info('confusion matrix')
-        disp = ConfusionMatrixDisplay(confusion_matrix=evaluator.state.metrics['cm'].numpy(),
-                                      display_labels=class_names)
-        disp.plot(xticks_rotation='vertical')
-        plt.tight_layout()
-        plt.show()
-        return accTotal
+            best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+            if best_model_path is not None:
+                best_model_path = os.path.join('best_models', best_model_path)
+                model.load_state_dict(torch.load(best_model_path))
+                logging.info('best model loaded: ', model_path)
+        df = predict_samples(model, test_dataloader, fold, target_mode)
+        df.to_csv(predictions_fname, index=False)
+    logging.info(df.head())
+    logging.info('prediction_results.csv saved')
+    df = error_analysis(df)
+    # logging.info(f"prediction summary: {df['error'].describe()}")
+    accTotal = float(len(df) - df['error'].sum()) / len(df)
+    logging.info(f' Prediction acc: {accTotal}')
+    class_names = list(C.labels.target_str_to_num.keys())
+    report = classification_report(df['y_true'], df['y_pred'], labels=range(len(class_names)),
+                                   target_names=class_names)
+    logging.info(report)
+    matrix = confusion_matrix(df['y_true'], df['y_pred'])
+    accuracies = matrix.diagonal() / matrix.sum(axis=1)
+    logging.info(' Accuracy per class:')
+    for acc, class_name in zip(accuracies, class_names):
+        logging.info(f'{class_name}: {acc}')
+    logging.info('confusion matrix')
+    disp = ConfusionMatrixDisplay(confusion_matrix=evaluator.state.metrics['cm'].numpy(),
+                                  display_labels=class_names)
+    disp.plot(xticks_rotation='vertical')
+    plt.tight_layout()
+    plt.show()
+    return accTotal
 
 
 if __name__ == "__main__":
@@ -238,6 +243,6 @@ if __name__ == "__main__":
 
     # training of autoencoders
     main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='ae',
-         freeze='No', optimizer='ADAM', only_eval=False)
+         freeze='No', optimizer='ADAM', only_eval=True)
 
     print('this is created from the browser :)')
