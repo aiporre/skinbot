@@ -147,9 +147,9 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         x_hat = torch.sigmoid(x_hat)
         engine.state.optimizer.zero_grad()
         if hasattr(model, 'compute_kl'):
-            loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
+            loss = ((x - x_hat) ** 2).sum(dim=1).mean() + model.compute_kl()
         else:
-            loss = ((x - x_hat) ** 2).sum()
+            loss = ((x - x_hat) ** 2).sum(dim=1).mean()
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()

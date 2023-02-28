@@ -79,7 +79,7 @@ class VariationalEncoder(nn.Module):
         mu = self.mean_mlp(x)
         sigma = torch.exp(self.std_mlp(x))
         z = mu + sigma * self.N.sample(mu.shape)
-        self.kl = (sigma ** 2 + mu ** 2 - torch.log(sigma) - 1 / 2).sum()
+        self.kl = -0.5 * (sigma ** 2 + mu ** 2 - torch.log(sigma) - 1).sum(dim=1).mean()
         return z
 
 
