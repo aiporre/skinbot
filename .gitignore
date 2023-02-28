@@ -6,3 +6,4 @@ data
 *.ini
 venv/**
 /.ipynb_checkpoints/
+./mnist_data

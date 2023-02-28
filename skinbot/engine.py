@@ -143,9 +143,12 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         if torch.has_cuda:
             torch.cuda.synchronize()
         # make a prediction reconstruction of vector x
-        x_hat = model(x, y=y)
+        x_hat = model(x, y=y) if model.conditional else model(x)
         engine.state.optimizer.zero_grad()
-        loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
+        if hasattr(model, 'compute_kl'):
+            loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
+        else:
+            loss = ((x - x_hat) ** 2).sum()
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()
@@ -153,7 +156,7 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         if hasattr(engine.state, 'warmup_scheduler') and engine.state.warmup_scheduler is not None:
             engine.state.warmup_scheduler.step()
 
-        return x, y, loss_value
+        return loss_value
 
     engine = Engine(update_model)
     engine.state.optimizer = optimizer
@@ -161,6 +164,20 @@ def create_autoencoder_trainer(model, optimizer, device=None):
 
 
 def create_autoencoder_evaluator(model, device=None):
+
+    class MSE:
+        def __call__(self, x_hat, x, **kwargs):
+            return ((x_hat - x) ** 2).mean()
+
+    class MAE:
+        def __call__(self, x_hat, x, **kwargs):
+            return (torch.absolute(x_hat - x)).mean()
+
+    class KL:
+        def __call__(self, x_hat, x, **kwargs):
+            return kwargs['kl']
+
+
     def update_model(engine, batch):
         model.eval()
         x, y = ae_prepare_batch(batch, device=device)
@@ -169,13 +186,22 @@ def create_autoencoder_evaluator(model, device=None):
             torch.cuda.synchronize()
         # start evaluation
         with torch.no_grad():
-            x_hat = model(x, y=y)
-            engine.state.metrics['mse'] = ((x_hat-x)**2).mean()
-            engine.state.metrics['mae'] = (torch.absolute(x_hat-x)).mean()
-            engine.state.metrics['kl'] = model.compute_kl()
-        return x, y
+            x_hat = model(x, y=y) if model.conditional else model(x)
+            kl = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
+        return x_hat, x, {'kl': kl}
 
-    return Engine(update_model)
+    evaluator = Engine(update_model)
+    
+    val_metrics = {
+        'mae': Loss(MAE()),
+        'mse': Loss(MSE()),
+        'kl': Loss(KL())
+    }
+    for name, metric in val_metrics.items():
+        metric.attach(evaluator, name)
+
+    return evaluator 
+
 
 def create_detection_trainer(model, optimizer, device=None):
     def update_model(engine, batch):
@@ -513,6 +539,132 @@ def configure_engines_classification(target_mode,
             handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
         else:
             logging.info(f'No best model found. starting from scratch')
+    evaluator.register_events(*CheckpointEvents)
+    evaluator.add_event_handler(CheckpointEvents.SAVE_BEST, handler_best)
+
+    return trainer, evaluator
+
+
+def configure_engines_autoencoder(target_mode,
+                                  model,
+                                  optimizer,
+                                  trainer,
+                                  evaluator,
+                                  train_dataloader,
+                                  test_dataloader,
+                                  config,
+                                  display_info,
+                                  fold,
+                                  model_name,
+                                  best_or_last,
+                                  patience,
+                                  model_path,
+                                  device):
+    RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
+
+    if display_info and torch.cuda.is_available():
+        from ignite.contrib.metrics import GpuInfo
+        GpuInfo().attach(trainer, name='gpu')
+
+    if config['LOGGER']['logtofile'] == 'True':
+        log_path = get_log_path(config)
+        log_file_handler = open(log_path, 'w')
+        pbar = ProgressBar(persist=True, file=log_file_handler)
+    else:
+        pbar = ProgressBar(persist=True)
+    pbar.attach(trainer, metric_names="all")
+
+    @trainer.on(Events.EPOCH_COMPLETED(every=1))
+    def log_training_results(engine):
+        logging.info('Evaluation of training set .... ')
+        evaluator.run(train_dataloader)
+
+        metrics = evaluator.state.metrics
+        mse = metrics["mse"]
+        mae = metrics["mae"]
+        kl = metrics['kl']
+        logging.info(f"TRAINING RESULTS: \n"
+                     f"Training Results - Epoch: {engine.state.epoch} " 
+                     f"MSE: {mse:.2f} " 
+                     f"MAE: {mae:.2f} "
+                     f"KL: {kl:.2f} ")
+
+    @trainer.on(Events.EPOCH_COMPLETED(every=1))
+    def log_validation_results(engine):
+        logging.info("Evaluation of testing set ...")
+        evaluator.run(test_dataloader)
+        metrics = evaluator.state.metrics
+        mse = metrics["mse"]
+        mae = metrics["mae"]
+        kl = metrics['kl']
+        logging.info(f"TESTING RESULTS: \n"
+                     f"testing Results - Epoch: {engine.state.epoch} "
+                     f"MSE: {mse:.2f}"
+                     f"MAE: {mae:.2f}"
+                     f"KL: {kl:.2f}")
+        evaluator.fire_event(CheckpointEvents.SAVE_BEST)
+
+    to_save = {"weights": model, "optimizer": optimizer}
+    handler_ckpt = Checkpoint(
+        to_save,
+        save_handler=DiskSaver('models', create_dir=True, require_empty=False),
+        n_saved=2,
+        filename_prefix=f"last_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
+    )
+    if best_or_last == 'last':
+        if model_path is None:
+            last_checkpoint_path = get_last_checkpoint('models', fold, model_name, target_mode)
+        else:
+            last_checkpoint_path = model_path
+        if last_checkpoint_path is not None:
+            last_checkpoint_path = os.path.join('models', last_checkpoint_path)
+            to_load = to_save
+            handler_ckpt.load_objects(to_load=to_load, checkpoint=last_checkpoint_path)
+            logging.info(f'loaded last checkpoint {last_checkpoint_path}')
+
+    trainer.add_event_handler(Events.ITERATION_COMPLETED(every=100), handler_ckpt)
+
+    ## early stopping
+    def score_function(engine):
+        val_loss = engine.state.metrics['loss']
+        return -val_loss
+
+    if patience is not None:
+        early_stop_handler = EarlyStopping(patience=patience, score_function=score_function, trainer=trainer)
+        trainer.add_event_handler(Events.EPOCH_COMPLETED, early_stop_handler)
+
+    to_save = {'model': model}
+    handler_best = Checkpoint(
+        to_save,
+        save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
+        n_saved=2,
+        filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
+        score_name="mse",
+        # global_step_transform=global_step_from_engine(trainer)
+    )
+
+    if best_or_last == 'best':
+        # get the best model path
+        if model_path is not None:
+            best_model_path = model_path
+        else:
+            # keeps the best_models directory clean
+            keep_best_two('best_models', fold, model_name, target_mode)
+            # get the best model path
+            best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+
+        # if success then load the best model
+        if best_model_path is not None:
+            best_model_path = os.path.join('best_models', best_model_path)
+            to_load = to_save
+            # model.load_state_dict(torch.load(best_model_path))
+            load_models(model, best_model_path, device)
+            to_save['model'] = model
+            logging.info(f'Loaded best model {best_model_path}')
+            handler_best.load_objects(to_load=to_load, checkpoint=best_model_path)
+        else:
+            logging.info(f'No best model found. starting from scratch')
+
     evaluator.register_events(*CheckpointEvents)
     evaluator.add_event_handler(CheckpointEvents.SAVE_BEST, handler_best)
 
@@ -859,5 +1011,7 @@ def configure_engines(target_mode, *args, **kwargs):
         return configure_engines_detection(target_mode, *args, **kwargs)
     elif 'segmentation' in target_mode.lower():
         return configure_engines_segmentation(target_mode, *args, **kwargs)
+    elif target_mode.lower() == 'reconstruction':
+        return configure_engines_autoencoder(target_mode, *args, **kwargs)
     else:
         return configure_engines_classification(target_mode, *args, **kwargs)
