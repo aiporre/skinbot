@@ -128,9 +128,9 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
                                       target_mode, test_dataloader, train_dataloader, device):
 
     logging.info('Running evaluations Train and test (in that order).')
-    # evaluator.run(train_dataloader)
+    evaluator.run(train_dataloader)
     logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
-    # evaluator.run(test_dataloader)
+    evaluator.run(test_dataloader)
     logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
     # plotting the lattent space with (T-SNE)
     num_classes = C.labels.num_classes

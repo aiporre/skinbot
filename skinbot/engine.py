@@ -168,11 +168,11 @@ def create_autoencoder_evaluator(model, device=None):
 
     class MSE:
         def __call__(self, x_hat, x, **kwargs):
-            return ((x_hat - x) ** 2).sum()
+            return ((x_hat - x) ** 2).sum(dim=1).mean()
 
     class MAE:
         def __call__(self, x_hat, x, **kwargs):
-            return (torch.absolute(x_hat - x)).sum()
+            return (torch.absolute(x_hat - x)).sum(dim=1).mean()
 
     class KL:
         def __call__(self, x_hat, x, **kwargs):
