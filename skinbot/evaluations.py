@@ -7,9 +7,13 @@ import torch
 from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
+
+from skinbot.config import Config
 from skinbot.dataset import crop_lesion, read_image
 import numpy as np
 from skimage.transform import resize
+C = Config()
+
 
 def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, index=0, target_layer="layer4.2.conv3"):
     """
@@ -137,3 +141,39 @@ def plot_bargraph_with_groupings(df, groupby, colourby, title, xlabel, ylabel, F
     plt.legend(handles=legend_list)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+
+def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False):
+    import matplotlib.colors as mcolors
+    d = {i: [] for i in range(num_classes)}
+
+    with torch.no_grad():
+        for i, (features, targets) in enumerate(data_loader):
+
+            features = features.to(device)
+            targets = targets.to(device)
+            targets_num = torch.argmax(targets, dim=1)
+
+            embedding = autoencoder.encoder(features)
+
+            for i in range(num_classes):
+                if i in targets_num:
+                    # print('torch.argmax(targets, dim=1)', torch.argmax(targets, dim=1))
+                    mask = targets_num == i
+                    d[i].append(embedding[mask].to('cpu').numpy())
+
+    colors = list(mcolors.TABLEAU_COLORS.items())
+    fig, ax = plt.subplots()
+    labels_strings = list(C.labels.target_str_to_num.keys())
+    for i in range(num_classes):
+        print('i', i)
+        d[i] = np.concatenate(d[i])
+        ax.scatter(
+            d[i][:, 0], d[i][:, 1],
+            color=colors[i][1],
+            label=f'{labels_strings[i]}',
+            alpha=0.5)
+
+    ax.legend()
+    if save:
+        fig.savefig('latent_space.png')
+    return fig, ax
