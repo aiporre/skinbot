@@ -92,6 +92,8 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         return super(NpEncoder, self).default(obj)
 
+def minmax(x):
+    return (x-x.min())/(x.max()-x.min())
 
 class WoundImages(Dataset):
     def __init__(self, root_dir,
@@ -281,7 +283,11 @@ class WoundImages(Dataset):
         # read the image and converts to float by multiplying by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = minmax(read_image(image_path))  #read_image(image_path) / 1.0 
+            rotation = get_image_rotation(image_path)
+            if rotation is not None:
+                # then rotate the image
+                image = rotate(image, angle=rotation, expand=True)
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -363,7 +369,7 @@ class WoundMaskedImages(WoundImages):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
@@ -423,7 +429,7 @@ class WoundDetectionImages(WoundImages):
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -460,7 +466,7 @@ class WoundColors(WoundImages):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
@@ -543,7 +549,7 @@ class WoundSegmentationImages(WoundImages):
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
