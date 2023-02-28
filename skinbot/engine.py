@@ -189,7 +189,7 @@ def create_autoencoder_evaluator(model, device=None):
         with torch.no_grad():
             x_hat = model(x, y=y) if model.conditional else model(x)
             x_hat = torch.sigmoid(x_hat)
-            kl = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
+            kl = model.compute_kl() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
         return x_hat, x, {'kl': kl}
 
     evaluator = Engine(update_model)

@@ -281,7 +281,7 @@ if __name__ == "__main__":
     #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
     # training of autoencoders
-    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='ae',
-         freeze='No', optimizer='ADAM', only_eval=True, best_or_last='last')
+    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=64, lr=1E-3, model_name='ae',
+         freeze='No', optimizer='ADAM', only_eval=True)
 
     print('this is created from the browser :)')
