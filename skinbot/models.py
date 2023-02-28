@@ -11,8 +11,8 @@ from skinbot.segmentation import UNet
 C = Config()
 
 
-def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
-    layers = [1024] if layers is None else layers
+def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.1):
+    layers = [1024, 1024, 512, 64] if layers is None else layers
     instances = []
     for l in layers:
         instances.append(nn.Linear(num_inputs, l))
