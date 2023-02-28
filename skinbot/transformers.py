@@ -126,7 +126,7 @@ class PretrainedMNIST:
                 # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ]),
             'val': transforms.Compose([
-                transforms.toTensor(),
+                transforms.ToTensor(),
                 MinMax(),
                 # transforms.Resize(input_size),
                 # transforms.CenterCrop(input_size),
