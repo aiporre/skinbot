@@ -58,22 +58,22 @@ class Pretrained:
             'train': transforms.Compose([
                     # transforms.Resize(input_size),
                     # transforms.CenterCrop(input_size),
-                    # ToLong(),
-                    # transforms.ColorJitter(brightness=0.5, hue=0.3),
                     transforms.RandomResizedCrop(input_size, scale=(0.8,0.8)),
                     transforms.RandomHorizontalFlip(),
                     transforms.RandomVerticalFlip(),
                     transforms.RandomRotation(90),
+                    # ToLong(),
+                    # transforms.ColorJitter(brightness=0.5, hue=0.3),
                     #transforms.ToTensor(),
                     ToFloat(),
-                    #transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                 ]),
             'val': transforms.Compose([
-                    transforms.Resize(input_size),
+                    transforms.Resize(232),
                     transforms.CenterCrop(input_size),
                     # transforms.ToTensor(),
                     ToFloat(),
-                    #transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                 ])
         }
     def __call__(self, x):
