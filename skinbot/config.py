@@ -31,6 +31,30 @@ class LabelConstantsAll:
 
     num_classes = len(target_str_to_num)
 
+class LabelConstantsMalignant:
+    target_str_to_num = {
+        'normal': 0,
+        'malignant': 1
+    }
+
+    target_weights = {
+        'normal': 0.5,
+        'malignant': 0.5,
+    }
+
+    fixed_error_labels = {
+        'vaskulitis': 'normal',
+        'dermatitis': 'normal',
+        'contact': 'normal',
+        'vasculitis': 'normal',
+        'necrosis': 'normal',
+        'infection': 'normal',
+        'pyoderma': 'normal',
+        'bland': 'normal'
+    }
+
+    num_classes = len(target_str_to_num)
+
 
 class LabelConstantsInfection:
     target_str_to_num = {
@@ -56,6 +80,31 @@ class LabelConstantsInfection:
 
     num_classes = len(target_str_to_num)
 
+class LabelConstantsSpecial:
+    target_str_to_num = {
+        'special': 0,
+        'malignant': 1,
+        'infection': 2,
+        'bland': 3 
+    }
+
+    target_weights = {
+        'special': 0.20, #0.08 + 0.05 + 0.05 + 0.07,
+        'malignant': 0.23,
+        'infection': 0.20,
+        'bland': 0.29
+    }
+
+    fixed_error_labels = {
+        'vaskulitis': 'special',
+        'dermatitis': 'special',
+        'contact': 'special',
+        'vasculitis': 'special',
+        'necrosis': 'special',
+        'pyoderma': 'special',
+    }
+
+    num_classes = len(target_str_to_num)
 
 class LabelSegmentation:
     target_str_to_num = {
@@ -157,6 +206,10 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsAll
         elif config['DATASET']['labels'].lower() == 'infection':
             self.labels = LabelConstantsInfection
+        elif config['DATASET']['labels'].lower() == 'malignant':
+            self.labels = LabelConstantsMalignant 
+        elif config['DATASET']['labels'].lower() == 'special':
+            self.labels = LabelConstantsSpecial
         elif config['DATASET']['labels'].lower() == 'demo':
             self.labels = LabelConstantsDemo
         elif config['DATASET']['labels'].lower() == 'segmentation':
