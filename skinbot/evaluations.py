@@ -142,7 +142,7 @@ def plot_bargraph_with_groupings(df, groupby, colourby, title, xlabel, ylabel, F
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
 
-def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False):
+def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False, dim_red=None):
     import matplotlib.colors as mcolors
     d = {i: [] for i in range(num_classes)}
 

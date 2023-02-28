@@ -12,7 +12,7 @@ from skinbot.dataset import get_dataloaders
 from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator, get_best_iteration, create_segmentation_trainer, \
-    create_segmentation_evaluator, create_autoencoder_trainer, create_autoencoder_evaluator
+    create_segmentation_evaluator, create_autoencoder_trainer, create_autoencoder_evaluator, get_last_checkpoint
 from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam, plot_latent_space
 from skinbot.models import get_model
 import skinbot.skinlogging as logging
@@ -115,17 +115,17 @@ def main(best_or_last='best',
         if 'single' in target_mode or 'multiple' in target_mode or 'fuzzy' in target_mode:
             return evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader,
-                                                     device)
+                                                     device, best_or_last)
         elif target_mode == 'reconstruction':
             return evaluation_actions_reconstruction(C, config, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader,
-                                                     device)
+                                                     device, best_or_last)
 
         else:
             raise Exception(f"Target mode = {target_mode} doen't have an evalution action.")
 
 def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold, model, model_name, model_path,
-                                      target_mode, test_dataloader, train_dataloader, device):
+                                      target_mode, test_dataloader, train_dataloader, device, best_or_last):
 
     logging.info('Running evaluations Train and test (in that order).')
     evaluator.run(train_dataloader)
@@ -135,6 +135,25 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
     # plotting the lattent space with (T-SNE)
     num_classes = C.labels.num_classes
     save_fig = True
+
+    # loading model
+
+    if model_path is not None:
+        model.load_state_dict(torch.load(model_path))
+        logging.info('model loaded: ', model_path)
+    else:
+        if best_or_last == 'best':
+            best_model_path = get_best_iteration('best_models', fold, model_name, target_mode)
+            if best_model_path is not None:
+                best_model_path = os.path.join('best_models', best_model_path)
+                model.load_state_dict(torch.load(best_model_path))
+                logging.info('best model loaded: %s ' % best_model_path)
+        else:
+            last_model_path = get_last_checkpoint('models', fold, model_name, target_mode)
+            if last_model_path is not None:
+                last_model_path = os.path.join('models', last_model_path)
+                model.load_state_dict(torch.load(last_model_path)['weights'])
+                logging.info('last model loaded: %s' % model_path)
     plot_latent_space(model, num_classes=num_classes, device=device, data_loader=test_dataloader, save=save_fig)
     return 0
 
@@ -263,6 +282,6 @@ if __name__ == "__main__":
 
     # training of autoencoders
     main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='ae',
-         freeze='No', optimizer='ADAM', only_eval=True)
+         freeze='No', optimizer='ADAM', only_eval=True, best_or_last='last')
 
     print('this is created from the browser :)')
