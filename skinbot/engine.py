@@ -599,6 +599,7 @@ def configure_engines_autoencoder(target_mode,
         mse = metrics["mse"]
         mae = metrics["mae"]
         kl = metrics['kl']
+        metrics['negval'] = -mse
         logging.info(f"TESTING RESULTS: \n"
                      f"testing Results - Epoch: {engine.state.epoch} "
                      f"MSE: {mse:.2f}"
@@ -641,7 +642,7 @@ def configure_engines_autoencoder(target_mode,
         save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
         n_saved=2,
         filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
-        score_name="mse",
+        score_name="negval",
         # global_step_transform=global_step_from_engine(trainer)
     )
 
