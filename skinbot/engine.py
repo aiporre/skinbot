@@ -137,13 +137,14 @@ def ae_prepare_batch(batch, device='cpu'):
 def create_autoencoder_trainer(model, optimizer, device=None):
     def update_model(engine, batch):
         model.train()
-        # prepaere batch
+        # prepare batch
         x, y = ae_prepare_batch(batch, device=device)
         # sync all GPU
         if torch.has_cuda:
             torch.cuda.synchronize()
         # make a prediction reconstruction of vector x
         x_hat = model(x, y=y) if model.conditional else model(x)
+        x_hat = torch.sigmoid(x_hat)
         engine.state.optimizer.zero_grad()
         if hasattr(model, 'compute_kl'):
             loss = ((x - x_hat) ** 2).sum() + model.compute_kl()
@@ -167,11 +168,11 @@ def create_autoencoder_evaluator(model, device=None):
 
     class MSE:
         def __call__(self, x_hat, x, **kwargs):
-            return ((x_hat - x) ** 2).mean()
+            return ((x_hat - x) ** 2).sum()
 
     class MAE:
         def __call__(self, x_hat, x, **kwargs):
-            return (torch.absolute(x_hat - x)).mean()
+            return (torch.absolute(x_hat - x)).sum()
 
     class KL:
         def __call__(self, x_hat, x, **kwargs):
@@ -187,6 +188,7 @@ def create_autoencoder_evaluator(model, device=None):
         # start evaluation
         with torch.no_grad():
             x_hat = model(x, y=y) if model.conditional else model(x)
+            x_hat = torch.sigmoid(x_hat)
             kl = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
         return x_hat, x, {'kl': kl}
 
