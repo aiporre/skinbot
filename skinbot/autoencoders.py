@@ -23,10 +23,8 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.encoder_mlp = get_mlp(num_inputs, latent_dims, dropout=0, layers=layers)
 
-    def forward(self, x, y=None):
+    def forward(self, x):
         x = torch.flatten(x, start_dim=1)
-        if y is not None:
-            x = torch.concat([x, y], dim=1)
         return self.encoder_mlp(x)
 
 
@@ -55,7 +53,9 @@ class AutoEncoder(nn.Module):
 
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
-        z = self.encoder(x, y=y)
+        z = self.encoder(x)
+        if y is not None:
+            z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
 
@@ -79,7 +79,7 @@ class VariationalEncoder(nn.Module):
         mu = self.mean_mlp(x)
         sigma = torch.exp(self.std_mlp(x))
         z = mu + sigma * self.N.sample(mu.shape)
-        self.kl = -0.5 * (sigma ** 2 + mu ** 2 - torch.log(sigma) - 1).sum(dim=1).mean()
+        self.kl = 0.5 * (sigma ** 2 + mu ** 2 - torch.log(sigma) - 1).sum(dim=1).mean()
         return z
 
 
@@ -100,7 +100,9 @@ class VariationalAutoEncoder(nn.Module):
         return self.encoder.kl
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
-        z = self.encoder(x, y=y)
+        z = self.encoder(x)
+        if y is not None:
+            z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
 class ConvolutionalAutoEncoder(nn.Module):

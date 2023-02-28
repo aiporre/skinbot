@@ -164,14 +164,37 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
     colors = list(mcolors.TABLEAU_COLORS.items())
     fig, ax = plt.subplots()
     labels_strings = list(C.labels.target_str_to_num.keys())
-    for i in range(num_classes):
-        print('i', i)
-        d[i] = np.concatenate(d[i])
-        ax.scatter(
-            d[i][:, 0], d[i][:, 1],
-            color=colors[i][1],
-            label=f'{labels_strings[i]}',
-            alpha=0.5)
+    if dim_red == 'tsne':
+        from sklearn.manifold import TSNE
+        X = []
+        lenghts = []
+        for i in range(num_classes):
+            d[i] = np.concatenate(d[i])
+            X.append(d[i])
+            lenghts.append(d[i].shape[0])
+        X = np.concatenate(X)
+
+        X_embedded = TSNE(n_components=2, learning_rate='auto',
+                          init='random', perplexity=3).fit_transform(X)
+        ptr = 0
+        for i in range(num_classes):
+            d[i] = X_embedded[ptr:ptr+lenghts[i]]
+            ptr += lenghts[i]
+            ax.scatter(
+                d[i][:, 0], d[i][:, 1],
+                color=colors[i][1],
+                label=f'{labels_strings[i]}',
+                alpha=0.5)
+
+    else:
+        for i in range(num_classes):
+            print('i', i)
+            d[i] = np.concatenate(d[i])
+            ax.scatter(
+                d[i][:, 0], d[i][:, 1],
+                color=colors[i][1],
+                label=f'{labels_strings[i]}',
+                alpha=0.5)
 
     ax.legend()
     if save:
