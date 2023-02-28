@@ -448,6 +448,7 @@ def configure_engines_classification(target_mode,
             f"Avg loss: {avg_nll:.2f} "
             f"Avg Cosine {metrics['cosine']:.2f}"
             f"Avg Euclidean: {metrics['euclidean']:.2f}")
+        evaluator.state.metrics['negloss'] = -avg_nll
 
         pbar.n = pbar.last_print_n = 0
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
@@ -487,7 +488,7 @@ def configure_engines_classification(target_mode,
         save_handler=DiskSaver('best_models', create_dir=True, require_empty=False),
         n_saved=2,
         filename_prefix=f"best_fold={fold}_{model_name}_{target_mode}_{C.label_setting()}",
-        score_name="nll",
+        score_name="accuracy",
         # global_step_transform=global_step_from_engine(trainer)
     )
 
