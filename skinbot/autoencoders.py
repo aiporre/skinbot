@@ -66,7 +66,7 @@ class VariationalEncoder(nn.Module):
         self.encoder_mlp = get_mlp(num_inputs, 512, dropout=0, layers=layers)
         # TODO: 512 is hardcoded
         self.mean_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
-        self.std_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
+        self.var_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
         self.N = torch.distributions.Normal(0, 1)
         if torch.cuda.is_available():
             self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
@@ -77,10 +77,11 @@ class VariationalEncoder(nn.Module):
         x = torch.flatten(x, start_dim=1)
         x = self.encoder_mlp(x)
         mu = self.mean_mlp(x)
-        sigma = torch.exp(self.std_mlp(x))
+        log_var = self.var_mlp(x)
+        sigma = torch.exp(0.5 * log_var)
         z = mu + sigma * self.N.sample(mu.shape)
-        self.kl = 0.5 * (sigma ** 2 + mu ** 2 - torch.log(sigma) - 1).sum(dim=1).mean()
-        return z
+        self.kl = 0.5 * (log_var.exp() + mu ** 2 - log_var - 1).sum(dim=1).mean()
+        return z, mu, log_var
 
 
 class VariationalAutoEncoder(nn.Module):
@@ -100,7 +101,7 @@ class VariationalAutoEncoder(nn.Module):
         return self.encoder.kl
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
-        z = self.encoder(x)
+        (z, _, _) = self.encoder(x)
         if y is not None:
             z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)

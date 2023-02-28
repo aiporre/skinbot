@@ -139,6 +139,8 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         model.train()
         # prepare batch
         x, y = ae_prepare_batch(batch, device=device)
+        x_org = copy.deepcopy(x)
+
         # sync all GPU
         if torch.has_cuda:
             torch.cuda.synchronize()
@@ -147,9 +149,9 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         x_hat = torch.sigmoid(x_hat)
         engine.state.optimizer.zero_grad()
         if hasattr(model, 'compute_kl'):
-            loss = ((x - x_hat) ** 2).sum(dim=1).mean() + model.compute_kl()
+            loss = ((x_org - x_hat) ** 2).sum(dim=1).mean() + model.compute_kl()
         else:
-            loss = ((x - x_hat) ** 2).sum(dim=1).mean()
+            loss = ((x_org - x_hat) ** 2).sum(dim=1).mean()
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()
@@ -183,6 +185,7 @@ def create_autoencoder_evaluator(model, device=None):
         model.eval()
         x, y = ae_prepare_batch(batch, device=device)
 
+        x_org = copy.deepcopy(x)
         if torch.has_cuda:
             torch.cuda.synchronize()
         # start evaluation
@@ -190,7 +193,7 @@ def create_autoencoder_evaluator(model, device=None):
             x_hat = model(x, y=y) if model.conditional else model(x)
             x_hat = torch.sigmoid(x_hat)
             kl = model.compute_kl().cpu().item() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
-        return x_hat, x, {'kl': kl}
+        return x_hat, x_org, {'kl': kl}
 
     evaluator = Engine(update_model)
     

@@ -754,20 +754,22 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
     target_transform =  TargeOneHotfromNum()
     if labels_config.lower() == 'mnist':
         DatasetClass = MNIST
+        T = PretrainedMNIST
     else:
         DatasetClass = WoundImages
+        T = Pretrained
     if mode == "all":
-        transform = PretrainedMNIST(test=True)
+        transform = T(test=True)
         wound_images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = PretrainedMNIST(test=True)
+        transform = T(test=True)
         wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
                                     transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
-        transform = PretrainedMNIST(test=False)
+        transform = T(test=False)
         wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
                                     transform=transform, target_transform=target_transform)
         shuffle_dataset = True
