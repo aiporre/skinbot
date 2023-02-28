@@ -115,8 +115,23 @@ def main(best_or_last='best',
         if 'single' in target_mode or 'multiple' in target_mode or 'fuzzy' in target_mode:
             return evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader)
+        elif target_mode == 'reconstruction':
+            return evaluation_actions_reconstruction(C, config, evaluator, external_data, fold, model, model_name,
+                                                     model_path, target_mode, test_dataloader, train_dataloader)
+
         else:
             raise Exception(f"Target mode = {target_mode} doen't have an evalution action.")
+
+def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold, model, model_name, model_path,
+                                      target_mode, test_dataloader, train_dataloader):
+
+    logging.info('Running evaluations Train and test (in that order).')
+    evaluator.run(train_dataloader)
+    logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
+    evaluator.run(test_dataloader)
+    logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
+
+    return 0
 
 
 def evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name, model_path,
