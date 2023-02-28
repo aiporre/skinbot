@@ -127,12 +127,12 @@ def main(best_or_last='best',
 def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold, model, model_name, model_path,
                                       target_mode, test_dataloader, train_dataloader, device, best_or_last):
 
-    # logging.info('Running evaluations Train and test (in that order).')
-    # evaluator.run(train_dataloader)
-    # logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
-    # evaluator.run(test_dataloader)
-    # logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
-    # # plotting the lattent space with (T-SNE)
+    logging.info('Running evaluations Train and test (in that order).')
+    evaluator.run(train_dataloader)
+    logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
+    evaluator.run(test_dataloader)
+    logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
+    # plotting the lattent space with (T-SNE)
     num_classes = C.labels.num_classes
     save_fig = True
 
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
     # training of autoencoders
-    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='cae',
-         freeze='No', optimizer='ADAM', only_eval=False, best_or_last='last')
+    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='ae',
+         freeze='No', optimizer='ADAM', only_eval=True, best_or_last='last')
 
     print('this is created from the browser :)')
