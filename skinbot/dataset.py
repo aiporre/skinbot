@@ -15,8 +15,10 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.io import read_image
+from torchvision.transforms import Compose
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
-    DetectionTarget, DetectionPretrained, PretrainedSegmentation, PretrainedMNIST, TargeOneHotfromNum
+    DetectionTarget, DetectionPretrained, PretrainedSegmentation, PretrainedMNIST, TargeOneHotfromNum, \
+    PretrainedReconstruction
 
 from skinbot.config import Config, LabelConstantsDetection
 from torchvision.transforms.functional import rotate
@@ -751,13 +753,15 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
     labels_config = config['DATASET']['labels']
     fuzzy_labels = False
     _crop_lesion = True
-    target_transform =  TargeOneHotfromNum()
     if labels_config.lower() == 'mnist':
         DatasetClass = MNIST
         T = PretrainedMNIST
+        target_transform = TargeOneHotfromNum()
     else:
         DatasetClass = WoundImages
-        T = Pretrained
+        T = PretrainedReconstruction
+        target_transform = Compose([TargetValue(), TargeOneHotfromNum()])
+
     if mode == "all":
         transform = T(test=True)
         wound_images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)

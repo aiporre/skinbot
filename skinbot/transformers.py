@@ -111,6 +111,34 @@ class MinMax:
         return (x - x.min()) / (x.max() - x.min())
 
 
+class PretrainedReconstruction:
+    def __init__(self, test=False, input_size=224):
+        self.test = test
+        self.T = {
+            'train': transforms.Compose([
+                # transforms.Resize(input_size),
+                # transforms.CenterCrop(input_size),
+                transforms.RandomResizedCrop(input_size, scale=(0.8,0.8)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(90),
+                # ToLong(),
+                # transforms.ColorJitter(brightness=0.5, hue=0.3),
+                #transforms.ToTensor(),
+                ToFloat(),
+            ]),
+            'val': transforms.Compose([
+                transforms.Resize(232),
+                transforms.CenterCrop(input_size),
+                ToFloat(),
+            ])
+        }
+
+    def __call__(self, x):
+        if self.test:
+            return self.T['val'](x)
+        else:
+            return self.T['train'](x)
 class PretrainedMNIST:
     def __init__(self, test=False, input_size=28):
         self.test = test
