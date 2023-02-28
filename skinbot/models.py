@@ -13,7 +13,6 @@ from skinbot.utils_models import get_backbone
 C = Config()
 
 
-
 def classification_model(model_name, num_outputs, freeze='No', pretrained=True):
     freeze = freeze.lower()
     backbone = None

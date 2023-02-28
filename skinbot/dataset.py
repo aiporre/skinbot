@@ -93,6 +93,8 @@ class NpEncoder(json.JSONEncoder):
             return obj.tolist()
         return super(NpEncoder, self).default(obj)
 
+def minmax(x):
+    return (x-x.min())/(x.max()-x.min())
 
 class MNIST(Dataset):
     def __init__(self, root_dir,
@@ -266,16 +268,16 @@ class WoundImages(Dataset):
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
 
-            analyse_mask(mask, lesion_ids, C.labels.target_str_to_num['lesion'])
+            analyse_mask(mask, lesion_ids, LabelConstantsDetection.target_str_to_num['lesion'])
             skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
             skin_ids.pop('blandSkin', None)
-            analyse_mask(mask, skin_ids, C.labels.target_str_to_num['lesion'])
+            analyse_mask(mask, skin_ids, LabelConstantsDetection.target_str_to_num['lesion'])
 
             if len(boxes) == 0:
-                logging.warning(f'Warning: No lesions found in image {self.image_fnames[index]}')
+                logging.warn(f'Warning: No lesions found in image {self.image_fnames[index]}')
             # getting the scale mask from the image
             scale_id = {"scale": 13}
-            analyse_mask(mask, scale_id, C.labels.target_str_to_num['scale'])
+            analyse_mask(mask, scale_id, LabelConstantsDetection.target_str_to_num['scale'])
             # save mask in npy file
             np.save(detection_npy_path, np.array(masks))
             # other info in json file
@@ -305,7 +307,11 @@ class WoundImages(Dataset):
         # read the image and converts to float by multiplying by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = minmax(read_image(image_path))  #read_image(image_path) / 1.0 
+            rotation = get_image_rotation(image_path)
+            if rotation is not None:
+                # then rotate the image
+                image = rotate(image, angle=rotation, expand=True)
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -387,7 +393,7 @@ class WoundMaskedImages(WoundImages):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
@@ -447,7 +453,7 @@ class WoundDetectionImages(WoundImages):
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
             raise e
@@ -484,7 +490,7 @@ class WoundColors(WoundImages):
         # read image and convert ot floay by diviing by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
@@ -568,7 +574,7 @@ class WoundSegmentationImages(WoundImages):
     def __getitem__(self, index):
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = read_image(image_path) / 1.0
+            image = read_image(image_path) / 255.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image

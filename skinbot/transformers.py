@@ -32,13 +32,11 @@ class TargetValue:
             x = C.labels.fixed_error_labels[x]
         return C.labels.target_str_to_num[x]
 
-
 class TargeOneHotfromNum:
     def __init__(self):
         self.target_set_num = len(C.labels.target_str_to_num)
         self.to_float = ToFloat()
         self.totesnor = transforms.ToTensor()
-
     def __call__(self, y):
         if not isinstance(y, torch.Tensor):
             y = torch.tensor(y, dtype=int)
@@ -66,26 +64,39 @@ class ToFloat:
                 f'Input x is type {type(x)} not supported. Valid inputs are torch.Tensor and numpy.ndarray')
 
 
+class ToLong:
+    def __call__(self, x):
+        if isinstance(x, torch.Tensor):
+            return x.long()
+        elif isinstance(x, np.ndarray):
+            return x.astype(np.int32)
+        else:
+            raise ValueError(f'Input x is type {type(x)} not supported. Valids are torch.Tensor and numpy.ndarray')
+
 class Pretrained:
     def __init__(self, test=False, input_size=224):
         self.test = test
         self.T = {
             'train': transforms.Compose([
-                transforms.RandomResizedCrop(input_size),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomVerticalFlip(),
-                transforms.RandomRotation(90),
-                # transforms.ToTensor(),
-                ToFloat(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ]),
+                    # transforms.Resize(input_size),
+                    # transforms.CenterCrop(input_size),
+                    transforms.RandomResizedCrop(input_size, scale=(0.8,0.8)),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.RandomRotation(90),
+                    # ToLong(),
+                    # transforms.ColorJitter(brightness=0.5, hue=0.3),
+                    #transforms.ToTensor(),
+                    ToFloat(),
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                ]),
             'val': transforms.Compose([
-                transforms.Resize(input_size),
-                transforms.CenterCrop(input_size),
-                # transforms.ToTensor(),
-                ToFloat(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
+                    transforms.Resize(232),
+                    transforms.CenterCrop(input_size),
+                    # transforms.ToTensor(),
+                    ToFloat(),
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                ])
         }
 
     def __call__(self, x):
@@ -115,6 +126,8 @@ class PretrainedMNIST:
                 # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ]),
             'val': transforms.Compose([
+                transforms.toTensor(),
+                MinMax(),
                 # transforms.Resize(input_size),
                 # transforms.CenterCrop(input_size),
                 # transforms.ToTensor(),
