@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 import skinbot.skinlogging as logging
-from skinbot.utils_models import get_backbone
+from skinbot.utils_models import get_backbone, PlainLayer
 
 
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
@@ -63,10 +63,13 @@ class AutoEncoder(nn.Module):
 class VariationalEncoder(nn.Module):
     def __init__(self, num_inputs, latent_dims, layers=None):
         super(VariationalEncoder, self).__init__()
-        self.encoder_mlp = get_mlp(num_inputs, 512, dropout=0, layers=layers)
+        if len(layers)>1:
+            self.encoder_mlp = get_mlp(num_inputs, layers[-1], dropout=0, layers=layers[:-1])
+        else:
+            self.encoder_mlp = PlainLayer()
         # TODO: 512 is hardcoded
-        self.mean_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
-        self.var_mlp = get_mlp(512, latent_dims, layers=[], dropout=0)
+        self.mean_mlp = get_mlp(layers[-1], latent_dims, layers=[], dropout=0)
+        self.var_mlp = get_mlp(layers[-1], latent_dims, layers=[], dropout=0)
         self.N = torch.distributions.Normal(0, 1)
         if torch.cuda.is_available():
             self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
@@ -87,12 +90,16 @@ class VariationalEncoder(nn.Module):
 class VariationalAutoEncoder(nn.Module):
     def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
         super(VariationalAutoEncoder, self).__init__()
+        assert len(layers) > 0, 'Variational autoencoder need layers to have at least one dimension'
+
         if num_classes is None:
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
+            layers.reverse()
             self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = False
         else:
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
+            layers.reverse()
             self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = True
         self.preserve_shape = preserve_shape
