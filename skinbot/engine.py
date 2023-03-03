@@ -149,16 +149,15 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         x_hat = torch.sigmoid(x_hat)
         engine.state.optimizer.zero_grad()
         if hasattr(model, 'compute_kl'):
-            gamma = 1.0
-            beta = 1.0
-            with torch.no_grad():
-                reconstruction_loss = gamma*((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0).item()
-                kl_div = beta*model.compute_kl().item()
-                # print("reconstruciton loss" , reconstruction_loss, "KL_DIV = ", kl_div)
-            loss = gamma*((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0) + beta*model.compute_kl()
+            gamma = 0.1 #1.0
+            beta = 1.
+            reconstruction_loss = gamma*((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).sum(dim=0)
+            kl_div = beta*model.compute_kl()
+            #  print("reconstruciton loss" , reconstruction_loss, "KL_DIV = ", kl_div)
+            loss = reconstruction_loss + kl_div 
             # loss = gamma*((x_org - x_hat) ** 2).sum() + beta*model.compute_kl()
         else:
-            loss = ((x_org - x_hat) ** 2).view(1,-1).sum(dim=1).mean(dim=0)
+            loss = ((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0)
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()
@@ -170,7 +169,7 @@ def create_autoencoder_trainer(model, optimizer, device=None):
 
         
         if hasattr(model, 'compute_kl'):
-            return {"loss": loss_value, "kl": kl_div, "reconstruction": reconstruction_loss}
+            return {"loss": loss_value, "kl": kl_div.item(), "reconstruction": reconstruction_loss.item()}
         else:
             return {"loss":loss_value}
 

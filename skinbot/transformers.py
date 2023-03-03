@@ -145,7 +145,7 @@ class PretrainedMNIST:
         self.T = {
             'train': transforms.Compose([
                 transforms.ToTensor(),
-                MinMax(),
+                # MinMax(),
                 # transforms.RandomResizedCrop(input_size),
                 # transforms.RandomHorizontalFlip(),
                 # transforms.RandomVerticalFlip(),
@@ -155,7 +155,7 @@ class PretrainedMNIST:
             ]),
             'val': transforms.Compose([
                 transforms.ToTensor(),
-                MinMax(),
+                # MinMax(),
                 # transforms.Resize(input_size),
                 # transforms.CenterCrop(input_size),
                 # transforms.ToTensor(),

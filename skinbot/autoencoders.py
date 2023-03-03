@@ -58,6 +58,57 @@ class AutoEncoder(nn.Module):
             z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
+class ConditionalGaussians(nn.Module):
+    def __init__(self, num_classes, latent_dims):
+        super(ConditionalGaussians, self).__init__()
+        self.means = nn.Parameter(torch.zeros((num_classes, latent_dims)), requires_grad=True)
+    def forward(self, z):
+        return z.unsqueeze(dim=1)-self.means.unsqueeze(dim=0)
+    def __str__(self):
+        with torch.no_grad():
+            means = self.means.detach().cpu().numpy()
+            return f"cond. means = {means}"
+
+
+class VariationalEncoderConditional(nn.Module):
+    def __init__(self, num_inputs, num_classes, latent_dims, layers=None):
+        super(VariationalEncoderConditional, self).__init__()
+        if layers is not None:
+            self.encoder_mlp = get_mlp(num_inputs, layers[-1], dropout=0, layers=layers[:-1])
+        else:
+            self.encoder_mlp = PlainLayer()
+        # TODO: 512 is hardcoded
+        self.mean_mlp = get_mlp(layers[-1], latent_dims, layers=[], dropout=0)
+        self.var_mlp = get_mlp(layers[-1], latent_dims, layers=[], dropout=0)
+        self.N = torch.distributions.Normal(0, 1)
+        if torch.cuda.is_available():
+            self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
+            self.N.scale = self.N.scale.cuda()
+        self.kl = 0
+        self.means_y = ConditionalGaussians(num_classes, latent_dims)
+
+    def forward(self, x, y=None):
+        x = torch.flatten(x, start_dim=1)
+        x = self.encoder_mlp(x)
+        mu = self.mean_mlp(x)
+        log_var = self.var_mlp(x)
+        sigma = torch.exp(0.5 * log_var)
+        z = mu + sigma * self.N.sample(mu.shape)
+        if y is not None:
+            z_prior = self.means_y(z)
+            # self.kl = 0.5*(sigma.unsqueeze(dim=1)**2 + z_prior**2-log_var.unsqueeze(dim=1) - 1)
+            # print('z_prior', z_prior)
+            self.kl = 0.5*(z_prior**2-log_var.unsqueeze(dim=1))
+            self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).squeeze()# .mean(dim=1)
+            # print('kl dimensions: ', self.kl.shape)
+            self.kl = self.kl.mean(dim=1)
+            # print('kl every batch element' , self.kl)
+            self.kl = self.kl.mean(dim=0)
+            # print('--> means', self.means_y)
+        else:
+            self.kl = 0
+        # self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
+        return z, mu, log_var
 
 
 class VariationalEncoder(nn.Module):
@@ -67,7 +118,6 @@ class VariationalEncoder(nn.Module):
             self.encoder_mlp = get_mlp(num_inputs, layers[-1], dropout=0, layers=layers[:-1])
         else:
             self.encoder_mlp = PlainLayer()
-        # TODO: 512 is hardcoded
         self.mean_mlp = get_mlp(layers[-1], latent_dims, layers=[], dropout=0)
         self.var_mlp = get_mlp(layers[-1], latent_dims, layers=[], dropout=0)
         self.N = torch.distributions.Normal(0, 1)
@@ -86,7 +136,6 @@ class VariationalEncoder(nn.Module):
         self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
 
-
 class VariationalAutoEncoder(nn.Module):
     def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
         super(VariationalAutoEncoder, self).__init__()
@@ -98,7 +147,7 @@ class VariationalAutoEncoder(nn.Module):
             self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = False
         else:
-            self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
+            self.encoder = VariationalEncoderConditional(num_inputs, num_classes, latent_dims, layers=layers)
             layers.reverse()
             self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
             self.conditional = True
@@ -108,7 +157,7 @@ class VariationalAutoEncoder(nn.Module):
         return self.encoder.kl
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
-        (z, _, _) = self.encoder(x)
+        (z, _, _) = self.encoder(x, y)
         if y is not None:
             z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
