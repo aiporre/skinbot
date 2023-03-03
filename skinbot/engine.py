@@ -149,17 +149,30 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         x_hat = torch.sigmoid(x_hat)
         engine.state.optimizer.zero_grad()
         if hasattr(model, 'compute_kl'):
-            loss = ((x_org - x_hat) ** 2).sum(dim=1).mean() + model.compute_kl()
+            gamma = 1.0
+            beta = 1.0
+            with torch.no_grad():
+                reconstruction_loss = gamma*((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0).item()
+                kl_div = beta*model.compute_kl().item()
+                # print("reconstruciton loss" , reconstruction_loss, "KL_DIV = ", kl_div)
+            loss = gamma*((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0) + beta*model.compute_kl()
+            # loss = gamma*((x_org - x_hat) ** 2).sum() + beta*model.compute_kl()
         else:
-            loss = ((x_org - x_hat) ** 2).sum(dim=1).mean()
+            loss = ((x_org - x_hat) ** 2).view(1,-1).sum(dim=1).mean(dim=0)
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()
+        # print('loss value', loss_value)
+        # print('kl = ', model.compute_kl())
 
         if hasattr(engine.state, 'warmup_scheduler') and engine.state.warmup_scheduler is not None:
             engine.state.warmup_scheduler.step()
 
-        return loss_value
+        
+        if hasattr(model, 'compute_kl'):
+            return {"loss": loss_value, "kl": kl_div, "reconstruction": reconstruction_loss}
+        else:
+            return {"loss":loss_value}
 
     engine = Engine(update_model)
     engine.state.optimizer = optimizer
@@ -170,11 +183,11 @@ def create_autoencoder_evaluator(model, device=None):
 
     class MSE:
         def __call__(self, x_hat, x, **kwargs):
-            return ((x_hat - x) ** 2).sum(dim=1).mean()
+            return ((x_hat - x) ** 2).view(1,-1).mean(dim=1).mean()
 
     class MAE:
         def __call__(self, x_hat, x, **kwargs):
-            return (torch.absolute(x_hat - x)).sum(dim=1).mean()
+            return (torch.absolute(x_hat - x)).view(1, -1).mean(dim=1).mean()
 
     class KL:
         def __call__(self, x_hat, x, **kwargs):
@@ -565,7 +578,25 @@ def configure_engines_autoencoder(target_mode,
                                   patience,
                                   model_path,
                                   device):
-    RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
+    # configure logging progress bar
+    if hasattr(model, 'compute_kl'):
+        loss_keys = ['loss', 'kl', 'reconstruction'] # get_loss_keys(model, train_dataloader)
+    else:
+        loss_keys = ['loss']
+
+    class RATrans:
+        def __init__(self, k):
+            self.k = k
+
+        def __call__(self, output):
+            loss = output
+            return loss[self.k]
+
+    for k in loss_keys:
+        RunningAverage(output_transform=RATrans(k)).attach(trainer, k)
+    # RunningAverage(output_transform=lambda output: sum(loss for loss in output[2].values()).item()).attach(trainer,
+    #                                                                                                        "loss")
+    # RunningAverage(output_transform=lambda x: x).attach(trainer, "loss")
 
     if display_info and torch.cuda.is_available():
         from ignite.contrib.metrics import GpuInfo
@@ -579,7 +610,7 @@ def configure_engines_autoencoder(target_mode,
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=1))
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_training_results(engine):
         logging.info('Evaluation of training set .... ')
         evaluator.run(train_dataloader)
@@ -594,7 +625,7 @@ def configure_engines_autoencoder(target_mode,
                      f"MAE: {mae:.2f} "
                      f"KL: {kl:.2f} ")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=1))
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_validation_results(engine):
         logging.info("Evaluation of testing set ...")
         evaluator.run(test_dataloader)
