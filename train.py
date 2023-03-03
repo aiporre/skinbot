@@ -81,6 +81,7 @@ def main(best_or_last='best',
     model, optimizer = get_model(model_name, optimizer=optimizer, lr=LR, momentum=momentum, freeze=freeze)
     # move model to gpu
     model.to(device)
+    print(model)
     # create trainer and evaluator
     if 'detection' in target_mode:
         trainer = create_detection_trainer(model, optimizer, device=device)
@@ -155,7 +156,7 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
                 model.load_state_dict(torch.load(last_model_path)['weights'])
                 logging.info('last model loaded: %s' % model_path)
     plot_latent_space(model, num_classes=num_classes, device=device, data_loader=test_dataloader, save=save_fig,
-                      dim_red='tsne')
+                      dim_red=None)
     return 0
 
 
@@ -282,7 +283,9 @@ if __name__ == "__main__":
     #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
     # training of autoencoders
-    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='ae',
-         freeze='No', optimizer='ADAM', only_eval=True, best_or_last='last')
+    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='cae',
+         freeze='No', optimizer='ADAM', only_eval=False)
 
+    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='cae',
+         freeze='No', optimizer='ADAM', only_eval=True)
     print('this is created from the browser :)')

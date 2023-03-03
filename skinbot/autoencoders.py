@@ -63,7 +63,7 @@ class AutoEncoder(nn.Module):
 class VariationalEncoder(nn.Module):
     def __init__(self, num_inputs, latent_dims, layers=None):
         super(VariationalEncoder, self).__init__()
-        if len(layers)>1:
+        if layers is not None:
             self.encoder_mlp = get_mlp(num_inputs, layers[-1], dropout=0, layers=layers[:-1])
         else:
             self.encoder_mlp = PlainLayer()
@@ -83,7 +83,7 @@ class VariationalEncoder(nn.Module):
         log_var = self.var_mlp(x)
         sigma = torch.exp(0.5 * log_var)
         z = mu + sigma * self.N.sample(mu.shape)
-        self.kl = 0.5 * (log_var.exp() + mu ** 2 - log_var - 1).sum(dim=1).mean()
+        self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
 
 
