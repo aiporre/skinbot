@@ -64,9 +64,8 @@ class ConditionalGaussians(nn.Module):
         _means = torch.empty(num_classes, latent_dims)
         _means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
         # _means = nn.init.zeros_(_means)
-        print('initi means: ', _means)
         self.means = nn.Parameter(_means, requires_grad=True)
-        
+
     def forward(self, z):
         return z.unsqueeze(dim=1)-self.means.unsqueeze(dim=0)
     def __str__(self):
@@ -89,7 +88,7 @@ class VariationalEncoderConditional(nn.Module):
         if torch.cuda.is_available():
             self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
             self.N.scale = self.N.scale.cuda()
-        self.kl = torch.tensor(0) 
+        self.kl = torch.tensor(0)
         self.means_y = ConditionalGaussians(num_classes, latent_dims)
 
     def forward(self, x, y=None):
@@ -104,7 +103,7 @@ class VariationalEncoderConditional(nn.Module):
             self.kl = 0.5*(z_prior**2 + sigma.unsqueeze(dim=1)**2 - log_var.unsqueeze(dim=1)-1)
             self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).mean() #.sum(dim=1).mean(dim=0) # .mean(dim=1)
         else:
-            self.kl = torch.tensor(0) 
+            self.kl = torch.tensor(0)
         # self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
 
@@ -125,10 +124,10 @@ class VariationalEncoder(nn.Module):
         self.kl = 0
 
     def forward(self, x):
-        x = torch.flatten(x, start_dim=1)
-        x = self.encoder_mlp(x)
-        mu = self.mean_mlp(x)
-        log_var = self.var_mlp(x)
+        x_flat = torch.flatten(x, start_dim=1)
+        h = self.encoder_mlp(x_flat)
+        mu = self.mean_mlp(h)
+        log_var = self.var_mlp(h)
         sigma = torch.exp(0.5 * log_var)
         z = mu + sigma * self.N.sample(mu.shape)
         self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
@@ -147,7 +146,7 @@ class VariationalAutoEncoder(nn.Module):
         else:
             self.encoder = VariationalEncoderConditional(num_inputs, num_classes, latent_dims, layers=layers)
             layers.reverse()
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
+            self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = True
         self.preserve_shape = preserve_shape
 
@@ -156,8 +155,8 @@ class VariationalAutoEncoder(nn.Module):
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
         (z, _, _) = self.encoder(x, y)
-        if y is not None:
-            z = torch.concat([z, y], dim=1)
+        # if y is not None:
+        #    z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
 class ConvolutionalAutoEncoder(nn.Module):
