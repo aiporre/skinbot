@@ -61,7 +61,12 @@ class AutoEncoder(nn.Module):
 class ConditionalGaussians(nn.Module):
     def __init__(self, num_classes, latent_dims):
         super(ConditionalGaussians, self).__init__()
-        self.means = nn.Parameter(torch.zeros((num_classes, latent_dims)), requires_grad=True)
+        _means = torch.empty(num_classes, latent_dims)
+        _means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
+        # _means = nn.init.zeros_(_means)
+        print('initi means: ', _means)
+        self.means = nn.Parameter(_means, requires_grad=True)
+        
     def forward(self, z):
         return z.unsqueeze(dim=1)-self.means.unsqueeze(dim=0)
     def __str__(self):
@@ -74,7 +79,7 @@ class VariationalEncoderConditional(nn.Module):
     def __init__(self, num_inputs, num_classes, latent_dims, layers=None):
         super(VariationalEncoderConditional, self).__init__()
         if layers is not None:
-            self.encoder_mlp = get_mlp(num_inputs, layers[-1], dropout=0, layers=layers[:-1])
+            self.encoder_mlp = nn.Sequential(get_mlp(num_inputs, layers[-1], dropout=0, layers=layers[:-1]), nn.ReLU())
         else:
             self.encoder_mlp = PlainLayer()
         # TODO: 512 is hardcoded
@@ -84,29 +89,22 @@ class VariationalEncoderConditional(nn.Module):
         if torch.cuda.is_available():
             self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
             self.N.scale = self.N.scale.cuda()
-        self.kl = 0
+        self.kl = torch.tensor(0) 
         self.means_y = ConditionalGaussians(num_classes, latent_dims)
 
     def forward(self, x, y=None):
-        x = torch.flatten(x, start_dim=1)
-        x = self.encoder_mlp(x)
-        mu = self.mean_mlp(x)
-        log_var = self.var_mlp(x)
+        x_flat = torch.flatten(x, start_dim=1)
+        h = self.encoder_mlp(x_flat)
+        mu = self.mean_mlp(h)
+        log_var = self.var_mlp(h)
         sigma = torch.exp(0.5 * log_var)
         z = mu + sigma * self.N.sample(mu.shape)
         if y is not None:
             z_prior = self.means_y(z)
-            # self.kl = 0.5*(sigma.unsqueeze(dim=1)**2 + z_prior**2-log_var.unsqueeze(dim=1) - 1)
-            # print('z_prior', z_prior)
-            self.kl = 0.5*(z_prior**2-log_var.unsqueeze(dim=1))
-            self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).squeeze()# .mean(dim=1)
-            # print('kl dimensions: ', self.kl.shape)
-            self.kl = self.kl.mean(dim=1)
-            # print('kl every batch element' , self.kl)
-            self.kl = self.kl.mean(dim=0)
-            # print('--> means', self.means_y)
+            self.kl = 0.5*(z_prior**2 + sigma.unsqueeze(dim=1)**2 - log_var.unsqueeze(dim=1)-1)
+            self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).mean() #.sum(dim=1).mean(dim=0) # .mean(dim=1)
         else:
-            self.kl = 0
+            self.kl = torch.tensor(0) 
         # self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
 

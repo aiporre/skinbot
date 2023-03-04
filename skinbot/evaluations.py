@@ -156,7 +156,7 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
             if isinstance(autoencoder, AutoEncoder):
                 embedding = autoencoder.encoder(features)
             else:
-                _, embedding, _ = autoencoder.encoder(features)
+                _ , embedding, _ = autoencoder.encoder(features)
 
             for i in range(num_classes):
                 if i in targets_num:
@@ -165,7 +165,7 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
                     d[i].append(embedding[mask].to('cpu').numpy())
 
     colors = list(mcolors.TABLEAU_COLORS.items())
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(5,5))
     labels_strings = list(C.labels.target_str_to_num.keys())
     if dim_red == 'tsne':
         from sklearn.manifold import TSNE
@@ -187,7 +187,8 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
                 d[i][:, 0], d[i][:, 1],
                 color=colors[i][1],
                 label=f'{labels_strings[i]}',
-                alpha=0.5)
+                alpha=0.5,
+                s=3**2)
 
     else:
         for i in range(num_classes):
@@ -197,7 +198,8 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
                 d[i][:, 0], d[i][:, 1],
                 color=colors[i][1],
                 label=f'{labels_strings[i]}',
-                alpha=0.5)
+                alpha=0.5,
+                s=3**2)
 
     ax.legend()
     if save:

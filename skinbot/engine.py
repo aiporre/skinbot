@@ -139,7 +139,7 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         model.train()
         # prepare batch
         x, y = ae_prepare_batch(batch, device=device)
-        x_org = copy.deepcopy(x)
+        # x_org = copy.deepcopy(x)
 
         # sync all GPU
         if torch.has_cuda:
@@ -149,15 +149,13 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         x_hat = torch.sigmoid(x_hat)
         engine.state.optimizer.zero_grad()
         if hasattr(model, 'compute_kl'):
-            gamma = 0.1 #1.0
-            beta = 1.
-            reconstruction_loss = gamma*((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).sum(dim=0)
+            gamma = 50. # 100.0 #1.0
+            beta = 0.1 #. # .
+            reconstruction_loss = gamma*((x - x_hat) ** 2).mean() #.flatten(start_dim=1).mean(dim=1).mean(dim=0)
             kl_div = beta*model.compute_kl()
-            #  print("reconstruciton loss" , reconstruction_loss, "KL_DIV = ", kl_div)
             loss = reconstruction_loss + kl_div 
-            # loss = gamma*((x_org - x_hat) ** 2).sum() + beta*model.compute_kl()
         else:
-            loss = ((x_org - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0)
+            loss = ((x - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0)
         loss.backward()
         engine.state.optimizer.step()
         loss_value = loss.item()
@@ -192,7 +190,14 @@ def create_autoencoder_evaluator(model, device=None):
         def __call__(self, x_hat, x, **kwargs):
             return kwargs['kl']
 
-
+    class criterion:
+        def __call__(self, x_hat, x, **kwargs):
+            gamma = 1.0 # 100.0 #1.0
+            beta = 1.0 # .
+            reconstruction_loss = gamma*((x - x_hat) ** 2).flatten(start_dim=1).mean(dim=1).mean()
+            kl_div = beta * kwargs['kl']
+            loss = reconstruction_loss + kl_div 
+            return loss
     def update_model(engine, batch):
         model.eval()
         x, y = ae_prepare_batch(batch, device=device)
@@ -212,6 +217,7 @@ def create_autoencoder_evaluator(model, device=None):
     val_metrics = {
         'mae': Loss(MAE()),
         'mse': Loss(MSE()),
+        'loss': Loss(criterion()),
         'kl': Loss(KL())
     }
     for name, metric in val_metrics.items():
@@ -618,11 +624,13 @@ def configure_engines_autoencoder(target_mode,
         mse = metrics["mse"]
         mae = metrics["mae"]
         kl = metrics['kl']
+        loss = metrics['loss']
         logging.info(f"TRAINING RESULTS: \n"
                      f"Training Results - Epoch: {engine.state.epoch} " 
-                     f"MSE: {mse:.2f} " 
-                     f"MAE: {mae:.2f} "
-                     f"KL: {kl:.2f} ")
+                     f"MSE: {mse:.5f} " 
+                     f"MAE: {mae:.5f} "
+                     f"LOSS: {loss:.5f} "
+                     f"KL: {kl:.5f} ")
 
     @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_validation_results(engine):
@@ -632,11 +640,13 @@ def configure_engines_autoencoder(target_mode,
         mse = metrics["mse"]
         mae = metrics["mae"]
         kl = metrics['kl']
-        metrics['negval'] = -mse
+        loss = metrics['loss']
+        metrics['negval'] = -loss
         logging.info(f"TESTING RESULTS: \n"
                      f"testing Results - Epoch: {engine.state.epoch} "
                      f"MSE: {mse:.2f}"
                      f"MAE: {mae:.2f}"
+                     f"LOSS: {loss:.5f} "
                      f"KL: {kl:.2f}")
         evaluator.fire_event(CheckpointEvents.SAVE_BEST)
 
