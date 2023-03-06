@@ -198,3 +198,46 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
     else:
         raise Exception(f'model name {model_name} is not defined')
     return backbone
+
+
+class Interpolation(nn.Module):
+    def __init__(self, size, mode):
+        super(Interpolation, self).__init__()
+        self.size = size,
+        self.mode = mode
+
+    def forward(self, x):
+        torch.nn.functional.interpolate(x, self.size, mode=self.mode)
+
+
+class DeconvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, upsampling_step):
+        super(DeconvBlock, self).__init__()
+        # Hout = (Hin−1)×stride[0]−2×padding[0]+dilation[0]×(kernel_size[0]−1)+output_padding[0]+1
+        # Hout = (Hin−1)×stride[0]+output_padding[0]+1
+        # if isinstance(input_size, int):
+        #     H, W = input_size, input_size
+        # else:
+        #     H, W = input_size
+        max_iters = 10
+        iters = 0
+
+        def error(s,a,b):
+            return (-s - 2*a + b + 1) != 0 or a<0 or b<0
+
+        epsilon = 0
+        padding = 0
+        output_padding = 0
+        while error(upsampling_step, padding, output_padding) and iters<max_iters:
+            iters +=1
+            padding = epsilon + 1 - upsampling_step
+            output_padding = 2*epsilon + 1 - upsampling_step
+            epsilon +=1
+        if iters>=max_iters and not error(upsampling_step, padding, output_padding):
+            raise RuntimeError('Cannot find padding and output_padding combinations')
+
+        self.upsample = nn.ConvTranspose2d(in_channels, out_channels, 3, stride=upsampling_step,
+                                      padding=padding, output_padding=output_padding)
+
+    def forward(self, x):
+        return self.upsample(x)
