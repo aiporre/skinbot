@@ -6,6 +6,8 @@ from skinbot.config import Config
 import math
 
 C = Config()
+
+
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
     layers = [1024] if layers is None else layers
     instances = []
@@ -25,6 +27,37 @@ def get_output_size(model, input_size):
     x = torch.randn(input_size)
     y = model(x)
     return tuple(y.shape)
+
+def get_conv_size(model, input_size):
+    B = 1 # batch_size
+    if isinstance(input_size, int):
+        input_size = (B , 3, input_size, input_size)
+    x = torch.randn(input_size)
+    from collections import OrderedDict
+    activation = OrderedDict()
+
+    def get_activation(name):
+        def hook(model, input, output):
+            activation[name] = output.detach().shape
+
+        return hook
+    for name, module in model.named_modules():
+        if hasattr(module, 'forward'):
+            module.register_forward_hook(get_activation(name))
+
+    y = model(x)
+    last_conv_output = None
+    last_conv_output_name = None
+    for a_name in reversed(activation):
+        a = activation[a_name]
+        if len(a) == 4 and a[-1]>1 and a[-2]>1:
+            last_conv_output = a
+            last_conv_output_name = a_name
+            break
+    if last_conv_output is None:
+        raise RuntimeError(f'Cannot find shape of 4 dimension (batch, channels, H, W).')
+    print(activation)
+    return last_conv_output_name, tuple(last_conv_output)
 
 class SmallCNN(nn.Module):
     # four layers convolutiona network with input 224x224x3
