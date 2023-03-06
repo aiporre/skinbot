@@ -30,12 +30,10 @@ class SmallCNN(nn.Module):
     # four layers convolutiona network with input 224x224x3
     def __init__(self, num_classes=2):
         super(SmallCNN, self).__init__()
-        # self.conv1 = nn.Conv2d(3, 16, 3, padding='same')
-        # self.conv2 = nn.Conv2d(16, 32, 3, padding='same')
-        # self.conv3 = nn.Conv2d(32, 64, 3, padding='same')
-        # self.conv4 = nn.Conv2d(64, 128, 3, padding='same')
         conv_layers_dims = eval(C.config['MODELS']['conv_layers'])
         input_size = eval(C.config['MODELS']['input_size'])
+        self.use_global_pool = bool(C.config['MODELS']['use_global_pool'])
+
         if isinstance(input_size, tuple):
             in_channels = input_size[-1]
         else:
@@ -53,8 +51,10 @@ class SmallCNN(nn.Module):
             in_channels = conv_dim
 
         self.backbone = nn.Sequential(*modules)
-
-        self.num_middle = math.prod(get_output_size(self.backbone, input_size))
+        if self.use_global_pool:
+            self.num_middle = math.prod(get_output_size(self.backbone, input_size))
+        else:
+            self.num_middle = conv_layers_dims[-1]
 
         fc_layers_dims = eval(C.config['MODELS']['fc_layers'])
         if len(fc_layers_dims) > 0:
@@ -65,7 +65,7 @@ class SmallCNN(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        if self.flatten:
+        if not self.use_global_pool:
             x = torch.flatten(x, 1)
         else:
             x = nn.functional.adaptive_max_pool2d(x, output_size=1)
