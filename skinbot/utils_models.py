@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch
 from torch import nn as nn
 from torchvision import models
@@ -241,3 +243,34 @@ class DeconvBlock(nn.Module):
 
     def forward(self, x):
         return self.upsample(x)
+def implements_flatten(model):
+    if isinstance(model, models.RegNet):
+        return False
+    elif isinstance(model, SmallCNN):
+        return not model.use_global_pool
+    elif isinstance(model, models.VGG):
+        return True
+    else:
+        raise ValueError(f"model {type(model)} is not recognized.")
+
+
+class Reshape(nn.Module):
+    def __init__(self, shape):
+        super(Reshape, self).__init__()
+        self.shape
+    def forward(self, x):
+        return torch.reshape(x, self.shape)
+class RecoverH1W1C1(nn.Module):
+    def __init__(self, num_input_features, H1, W1, C1, from_flatten):
+        super(RecoverH1W1C1, self).__init__()
+        if from_flatten:
+            modules = OrderedDict()
+            modules['fc_h1w1_recover'] = nn.Linear(num_input_features, H1*W1)
+            modules['reshape'] = Reshape((1,H1,W1))
+            modules['conv_c1_recover'] = nn.Conv2d(1, C1, 1)
+            self.recover = nn.Sequential(modules)
+        else:
+            self.recover = Reshape((C1,H1,W1))
+
+    def forward(self, x):
+        return self.recover(x)
