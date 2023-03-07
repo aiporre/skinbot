@@ -173,9 +173,10 @@ class ConvolutionalAutoEncoder(nn.Module):
                  layers=None,
                  preserve_shape=False,
                  varational=False,
-                 reconstruct_image_features=False):
+                 reconstruct_image_features=False,
+                 backbone_name='resnet50'):
 
-        self.backbone = get_backbone('resnet50', None, freeze='Yes', conv_only=True)
+        self.backbone = get_backbone(backbone_name, None, freeze='Yes', conv_only=True)
         num_features_backbone = self.backbone.num_features
         if varational:
             self.autoencoder = AutoEncoder(num_inputs=num_features_backbone,
@@ -225,8 +226,6 @@ class ConvolutionalAutoEncoder(nn.Module):
             self.interpolation = Interpolation((m0h, m0w), mode='linear')
             self.output_layer = nn.Conv2d(num_channels, 3, 1)
 
-            # self.deconvolution = Deconvolution(num_inputs, output_size=input_size)
-            raise Exception("Not implemente decovntion to reconsvtruio image")
     def forward(self, x):
         h = self.backbone(x)
         h_hat = self.autoencoder(h)
