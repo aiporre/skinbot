@@ -1,8 +1,11 @@
+import math
+
 import torch
 import torch.nn as nn
 
 import skinbot.skinlogging as logging
-from skinbot.utils_models import get_backbone, PlainLayer
+from skinbot.utils_models import get_backbone, PlainLayer, get_conv_size, Interpolation, DeconvBlock, \
+    implements_flatten, RecoverH1W1C1
 
 
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
@@ -190,7 +193,48 @@ class ConvolutionalAutoEncoder(nn.Module):
                                        layers=layers,
                                        preserve_shape=preserve_shape)
 
+        self.reconstruct_image_features =   reconstruct_image_features
+
         if not reconstruct_image_features:
             # needs a reconstruction of original input image.
+            # self.global_avg_pool = nn.AdaptiveAvgPool2ddaptive_max_pool2d(output_size=1)
+
+            num_deconv_steps = 3 # todo hardcoded int(C.config['AUTONECODES....
+            m0C, m0h, m0w = tuple([3] + list(input_size)) if isinstance(input_size, (list, tuple)) else (3, input_size, input_size)
+            B, m1C, m1h, m1w = get_conv_size(self.backbone, input_size)
+
+
+            # recover layer the H1, W1 C1 from the backbone output that can be flatten or using avg max pool
+            self.recover_H1W1C1 = RecoverH1W1C1(num_input_features=num_features_backbone,
+                                                 H1=m1h, W1=m1w, C1=m1C,
+                                                 from_flatten=implements_flatten(self.backbone))
+            m0 = min(m0h, m0w)
+            m1 = min(m1h, m1w)
+            upsampling_step = math.floor(m0/m1^(1/num_deconv_steps))
+            upsampling_modules = []
+            num_channels = m1C
+            output_size = (m1h,m1w)
+            for i in range(num_deconv_steps):
+                upsampling_modules.append(DeconvBlock(num_channels, num_channels//2, upsampling_step))
+                # update the output calculation
+                output_size = (m1h*upsampling_step, m1w*upsampling_step)
+                num_channels = num_channels//2
+                if num_channels//num_channels < 3:
+                    break
+            self.deconv = nn.Sequential(*upsampling_modules)
+            self.interpolation = Interpolation((m0h, m0w), mode='linear')
+            self.output_layer = nn.Conv2d(num_channels, 3, 1)
+
             # self.deconvolution = Deconvolution(num_inputs, output_size=input_size)
             raise Exception("Not implemente decovntion to reconsvtruio image")
+    def forward(self, x):
+        h = self.backbone(x)
+        h_hat = self.autoencoder(h)
+        if not self.reconstruct_image_features:
+           h_hat = self.recover_H1W1C1(h_hat)
+           h_hat = self.deconv(h_hat)
+           h_hat = self.interpolation(h_hat)
+           h_hat = self.output_layer(h_hat)
+
+        return h_hat
+
