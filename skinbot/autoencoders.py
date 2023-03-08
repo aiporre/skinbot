@@ -1,8 +1,11 @@
+import math
+
 import torch
 import torch.nn as nn
 
 import skinbot.skinlogging as logging
-from skinbot.utils_models import get_backbone, PlainLayer
+from skinbot.utils_models import get_backbone, PlainLayer, get_conv_size, Interpolation, DeconvBlock, \
+    implements_flatten, RecoverH1W1C1
 
 
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
@@ -64,9 +67,8 @@ class ConditionalGaussians(nn.Module):
         _means = torch.empty(num_classes, latent_dims)
         _means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
         # _means = nn.init.zeros_(_means)
-        print('initi means: ', _means)
         self.means = nn.Parameter(_means, requires_grad=True)
-        
+
     def forward(self, z):
         return z.unsqueeze(dim=1)-self.means.unsqueeze(dim=0)
     def __str__(self):
@@ -89,7 +91,7 @@ class VariationalEncoderConditional(nn.Module):
         if torch.cuda.is_available():
             self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
             self.N.scale = self.N.scale.cuda()
-        self.kl = torch.tensor(0) 
+        self.kl = torch.tensor(0)
         self.means_y = ConditionalGaussians(num_classes, latent_dims)
 
     def forward(self, x, y=None):
@@ -104,7 +106,7 @@ class VariationalEncoderConditional(nn.Module):
             self.kl = 0.5*(z_prior**2 + sigma.unsqueeze(dim=1)**2 - log_var.unsqueeze(dim=1)-1)
             self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).mean() #.sum(dim=1).mean(dim=0) # .mean(dim=1)
         else:
-            self.kl = torch.tensor(0) 
+            self.kl = torch.tensor(0)
         # self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
 
@@ -125,10 +127,10 @@ class VariationalEncoder(nn.Module):
         self.kl = 0
 
     def forward(self, x):
-        x = torch.flatten(x, start_dim=1)
-        x = self.encoder_mlp(x)
-        mu = self.mean_mlp(x)
-        log_var = self.var_mlp(x)
+        x_flat = torch.flatten(x, start_dim=1)
+        h = self.encoder_mlp(x_flat)
+        mu = self.mean_mlp(h)
+        log_var = self.var_mlp(h)
         sigma = torch.exp(0.5 * log_var)
         z = mu + sigma * self.N.sample(mu.shape)
         self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
@@ -147,7 +149,7 @@ class VariationalAutoEncoder(nn.Module):
         else:
             self.encoder = VariationalEncoderConditional(num_inputs, num_classes, latent_dims, layers=layers)
             layers.reverse()
-            self.decoder = Decoder(latent_dims+num_classes, num_outputs, layers=layers)
+            self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = True
         self.preserve_shape = preserve_shape
 
@@ -156,8 +158,8 @@ class VariationalAutoEncoder(nn.Module):
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
         (z, _, _) = self.encoder(x, y)
-        if y is not None:
-            z = torch.concat([z, y], dim=1)
+        # if y is not None:
+        #    z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
 class ConvolutionalAutoEncoder(nn.Module):
@@ -171,9 +173,10 @@ class ConvolutionalAutoEncoder(nn.Module):
                  layers=None,
                  preserve_shape=False,
                  varational=False,
-                 reconstruct_image_features=False):
+                 reconstruct_image_features=False,
+                 backbone_name='resnet50'):
 
-        self.backbone = get_backbone('resnet50', None, freeze='Yes', conv_only=True)
+        self.backbone = get_backbone(backbone_name, None, freeze='Yes', conv_only=True)
         num_features_backbone = self.backbone.num_features
         if varational:
             self.autoencoder = AutoEncoder(num_inputs=num_features_backbone,
@@ -191,7 +194,46 @@ class ConvolutionalAutoEncoder(nn.Module):
                                        layers=layers,
                                        preserve_shape=preserve_shape)
 
+        self.reconstruct_image_features =   reconstruct_image_features
+
         if not reconstruct_image_features:
             # needs a reconstruction of original input image.
-            # self.deconvolution = Deconvolution(num_inputs, output_size=input_size)
-            raise Exception("Not implemente decovntion to reconsvtruio image")
+            # self.global_avg_pool = nn.AdaptiveAvgPool2ddaptive_max_pool2d(output_size=1)
+
+            num_deconv_steps = 3 # todo hardcoded int(C.config['AUTONECODES....
+            m0C, m0h, m0w = tuple([3] + list(input_size)) if isinstance(input_size, (list, tuple)) else (3, input_size, input_size)
+            B, m1C, m1h, m1w = get_conv_size(self.backbone, input_size)
+
+
+            # recover layer the H1, W1 C1 from the backbone output that can be flatten or using avg max pool
+            self.recover_H1W1C1 = RecoverH1W1C1(num_input_features=num_features_backbone,
+                                                 H1=m1h, W1=m1w, C1=m1C,
+                                                 from_flatten=implements_flatten(self.backbone))
+            m0 = min(m0h, m0w)
+            m1 = min(m1h, m1w)
+            upsampling_step = math.floor(m0/m1^(1/num_deconv_steps))
+            upsampling_modules = []
+            num_channels = m1C
+            output_size = (m1h,m1w)
+            for i in range(num_deconv_steps):
+                upsampling_modules.append(DeconvBlock(num_channels, num_channels//2, upsampling_step))
+                # update the output calculation
+                output_size = (m1h*upsampling_step, m1w*upsampling_step)
+                num_channels = num_channels//2
+                if num_channels//num_channels < 3:
+                    break
+            self.deconv = nn.Sequential(*upsampling_modules)
+            self.interpolation = Interpolation((m0h, m0w), mode='linear')
+            self.output_layer = nn.Conv2d(num_channels, 3, 1)
+
+    def forward(self, x):
+        h = self.backbone(x)
+        h_hat = self.autoencoder(h)
+        if not self.reconstruct_image_features:
+           h_hat = self.recover_H1W1C1(h_hat)
+           h_hat = self.deconv(h_hat)
+           h_hat = self.interpolation(h_hat)
+           h_hat = self.output_layer(h_hat)
+
+        return h_hat
+

@@ -1,7 +1,14 @@
+from collections import OrderedDict
+
 import torch
 from torch import nn as nn
 from torchvision import models
 import skinbot.skinlogging as logging
+from skinbot.config import Config
+import math
+
+C = Config()
+
 
 def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
     layers = [1024] if layers is None else layers
@@ -15,24 +22,88 @@ def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
     instances.append(nn.Linear(num_inputs, num_outputs))
     return nn.Sequential(*instances)
 
+def get_output_size(model, input_size):
+    B = 1 # batch_size
+    if isinstance(input_size, int):
+        input_size = (B , 3, input_size, input_size)
+    x = torch.randn(input_size)
+    y = model(x)
+    return tuple(y.shape)
+
+def get_conv_size(model, input_size):
+    B = 1 # batch_size
+    if isinstance(input_size, int):
+        input_size = (B , 3, input_size, input_size)
+    x = torch.randn(input_size)
+    from collections import OrderedDict
+    activation = OrderedDict()
+
+    def get_activation(name):
+        def hook(model, input, output):
+            activation[name] = output.detach().shape
+
+        return hook
+    for name, module in model.named_modules():
+        if hasattr(module, 'forward'):
+            module.register_forward_hook(get_activation(name))
+
+    y = model(x)
+    last_conv_output = None
+    last_conv_output_name = None
+    for a_name in reversed(activation):
+        a = activation[a_name]
+        if len(a) == 4 and a[-1]>1 and a[-2]>1:
+            last_conv_output = a
+            last_conv_output_name = a_name
+            break
+    if last_conv_output is None:
+        raise RuntimeError(f'Cannot find shape of 4 dimension (batch, channels, H, W).')
+    print(activation)
+    return last_conv_output_name, tuple(last_conv_output)
+
 class SmallCNN(nn.Module):
     # four layers convolutiona network with input 224x224x3
     def __init__(self, num_classes=2):
         super(SmallCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, 3, padding='same')
-        self.conv2 = nn.Conv2d(16, 32, 3, padding='same')
-        self.conv3 = nn.Conv2d(32, 64, 3, padding='same')
-        self.conv4 = nn.Conv2d(64, 128, 3, padding='same')
-        self.pool = nn.MaxPool2d(2, 2)
-        self.num_middle = 128 * 14 * 14
-        self.fc = get_mlp(self.num_middle, num_classes, layers=[1024], dropout=0.5)
+        conv_layers_dims = eval(C.config['MODELS']['conv_layers'])
+        input_size = eval(C.config['MODELS']['input_size'])
+        self.use_global_pool = bool(C.config['MODELS']['use_global_pool'])
+
+        if isinstance(input_size, tuple):
+            in_channels = input_size[-1]
+        else:
+            in_channels = 3
+        modules = []
+        for conv_dim in conv_layers_dims:
+            modules.append(
+                nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels=conv_dim,
+                              kernel_size=3, stride=1, padding=1),
+                    nn.BatchNorm2d(conv_dim),
+                    nn.LeakyReLU(),
+                    nn.MaxPool2d(2, 2))
+            )
+            in_channels = conv_dim
+
+        self.backbone = nn.Sequential(*modules)
+        if self.use_global_pool:
+            self.num_middle = math.prod(get_output_size(self.backbone, input_size))
+        else:
+            self.num_middle = conv_layers_dims[-1]
+
+        fc_layers_dims = eval(C.config['MODELS']['fc_layers'])
+        if len(fc_layers_dims) > 0:
+            self.fc = get_mlp(self.num_middle, num_classes, layers=fc_layers_dims, dropout=0.5)
+        else:
+            self.fc = PlainLayer()
+
 
     def forward(self, x):
-        x = self.pool(nn.ReLU()(self.conv1(x)))
-        x = self.pool(nn.ReLU()(self.conv2(x)))
-        x = self.pool(nn.ReLU()(self.conv3(x)))
-        x = self.pool(nn.ReLU()(self.conv4(x)))
-        x = torch.flatten(x, 1)
+        x = self.backbone(x)
+        if not self.use_global_pool:
+            x = torch.flatten(x, 1)
+        else:
+            x = nn.functional.adaptive_max_pool2d(x, output_size=1)
         x = self.fc(x)
         return x
 class PlainLayer(nn.Module):
@@ -129,3 +200,77 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
     else:
         raise Exception(f'model name {model_name} is not defined')
     return backbone
+
+
+class Interpolation(nn.Module):
+    def __init__(self, size, mode):
+        super(Interpolation, self).__init__()
+        self.size = size,
+        self.mode = mode
+
+    def forward(self, x):
+        torch.nn.functional.interpolate(x, self.size, mode=self.mode)
+
+
+class DeconvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, upsampling_step):
+        super(DeconvBlock, self).__init__()
+        # Hout = (Hin−1)×stride[0]−2×padding[0]+dilation[0]×(kernel_size[0]−1)+output_padding[0]+1
+        # Hout = (Hin−1)×stride[0]+output_padding[0]+1
+        # if isinstance(input_size, int):
+        #     H, W = input_size, input_size
+        # else:
+        #     H, W = input_size
+        max_iters = 10
+        iters = 0
+
+        def error(s,a,b):
+            return (-s - 2*a + b + 1) != 0 or a<0 or b<0
+
+        epsilon = 0
+        padding = 0
+        output_padding = 0
+        while error(upsampling_step, padding, output_padding) and iters<max_iters:
+            iters +=1
+            padding = epsilon + 1 - upsampling_step
+            output_padding = 2*epsilon + 1 - upsampling_step
+            epsilon +=1
+        if iters>=max_iters and not error(upsampling_step, padding, output_padding):
+            raise RuntimeError('Cannot find padding and output_padding combinations')
+
+        self.upsample = nn.ConvTranspose2d(in_channels, out_channels, 3, stride=upsampling_step,
+                                      padding=padding, output_padding=output_padding)
+
+    def forward(self, x):
+        return self.upsample(x)
+def implements_flatten(model):
+    if isinstance(model, models.RegNet):
+        return False
+    elif isinstance(model, SmallCNN):
+        return not model.use_global_pool
+    elif isinstance(model, models.VGG):
+        return True
+    else:
+        raise ValueError(f"model {type(model)} is not recognized.")
+
+
+class Reshape(nn.Module):
+    def __init__(self, shape):
+        super(Reshape, self).__init__()
+        self.shape
+    def forward(self, x):
+        return torch.reshape(x, self.shape)
+class RecoverH1W1C1(nn.Module):
+    def __init__(self, num_input_features, H1, W1, C1, from_flatten):
+        super(RecoverH1W1C1, self).__init__()
+        if from_flatten:
+            modules = OrderedDict()
+            modules['fc_h1w1_recover'] = nn.Linear(num_input_features, H1*W1)
+            modules['reshape'] = Reshape((1,H1,W1))
+            modules['conv_c1_recover'] = nn.Conv2d(1, C1, 1)
+            self.recover = nn.Sequential(modules)
+        else:
+            self.recover = Reshape((C1,H1,W1))
+
+    def forward(self, x):
+        return self.recover(x)
