@@ -779,7 +779,7 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
         shuffle_dataset = True
 
     # wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
-    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, num_workers=4)
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset)
 
     return dataloader
 

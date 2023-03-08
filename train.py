@@ -283,9 +283,9 @@ if __name__ == "__main__":
     #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
     # training of autoencoders
-    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='cae',
-         freeze='No', optimizer='ADAM', only_eval=False)
+    main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=128, lr=1E-03, model_name='cvae',
+          freeze='No', optimizer='ADAM', only_eval=False)
 
-    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='cae',
+    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=3, lr=1E-03, model_name='cvae',
          freeze='No', optimizer='ADAM', only_eval=True)
     print('this is created from the browser :)')
