@@ -70,8 +70,8 @@ def main(best_or_last='best',
         assert model_name in valid_detection_models, f'{target_mode} requires model ({valid_detection_models})'
 
     if 'construction' in target_mode:
-        valid_detection_models = ['ae', 'vae', 'cae', 'cvae']
-        assert model_name in valid_detection_models, f'{target_mode} requires model ({valid_detection_models})'
+        valid_detection_models = ['ae', 'vae', 'cae', 'cvae', 'convae', 'convvae', 'convcvae']
+        assert model_name.lower() in valid_detection_models, f'{target_mode} requires model ({valid_detection_models}). Not {model_name}'
 
     _fold = fold if not external_data else None
     test_dataloader = get_dataloaders(config, batch=batch_size, mode='test', fold_iteration=_fold, target=target_mode)
@@ -283,9 +283,9 @@ if __name__ == "__main__":
     #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
     # training of autoencoders
-    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='cae',
+    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=4, lr=1E-03, model_name='convAE',
          freeze='No', optimizer='ADAM', only_eval=False)
 
-    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='cae',
-         freeze='No', optimizer='ADAM', only_eval=True)
+    # main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=4, lr=1E-03, model_name='cvae',
+    #      freeze='No', optimizer='ADAM', only_eval=True)
     print('this is created from the browser :)')

@@ -152,6 +152,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             logging.info(f"Freezing all layers before {freeze}")
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
+        backbone.num_features = num_features
         backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
     elif model_name == 'resnet18':
         weights = models.ResNet18_Weights.DEFAULT  # if pretrained else None
@@ -263,7 +264,7 @@ class Reshape(nn.Module):
 class RecoverH1W1C1(nn.Module):
     def __init__(self, num_input_features, H1, W1, C1, from_flatten):
         super(RecoverH1W1C1, self).__init__()
-        if from_flatten:
+        if not from_flatten:
             modules = OrderedDict()
             modules['fc_h1w1_recover'] = nn.Linear(num_input_features, H1*W1)
             modules['reshape'] = Reshape((1,H1,W1))

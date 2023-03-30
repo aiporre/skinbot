@@ -165,8 +165,7 @@ class VariationalAutoEncoder(nn.Module):
 class ConvolutionalAutoEncoder(nn.Module):
 
     # def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
-    def __init__(self, input_size,
-                 num_inputs,
+    def __init__(self, num_inputs,
                  num_outputs,
                  latent_dims,
                  num_classes=None,
@@ -175,12 +174,12 @@ class ConvolutionalAutoEncoder(nn.Module):
                  varational=False,
                  reconstruct_image_features=False,
                  backbone_name='resnet50'):
-
+        super(ConvolutionalAutoEncoder, self).__init__()
         self.backbone = get_backbone(backbone_name, None, freeze='Yes', conv_only=True)
         num_features_backbone = self.backbone.num_features
         if varational:
             self.autoencoder = AutoEncoder(num_inputs=num_features_backbone,
-                                           num_outputs=num_outputs,
+                                           num_outputs=num_features_backbone,
                                            latent_dims=latent_dims,
                                            num_classes=num_classes,
                                            layers=layers,
@@ -188,27 +187,29 @@ class ConvolutionalAutoEncoder(nn.Module):
         else:
             self.autoencoder = VariationalAutoEncoder(
                                        num_inputs=num_features_backbone,
-                                       num_outputs=num_outputs,
+                                       num_outputs=num_features_backbone,
                                        latent_dims=latent_dims,
                                        num_classes=num_classes,
                                        layers=layers,
                                        preserve_shape=preserve_shape)
 
-        self.reconstruct_image_features =   reconstruct_image_features
+        self.reconstruct_image_features = reconstruct_image_features
 
         if not reconstruct_image_features:
             # needs a reconstruction of original input image.
             # self.global_avg_pool = nn.AdaptiveAvgPool2ddaptive_max_pool2d(output_size=1)
 
             num_deconv_steps = 3 # todo hardcoded int(C.config['AUTONECODES....
-            m0C, m0h, m0w = tuple([3] + list(input_size)) if isinstance(input_size, (list, tuple)) else (3, input_size, input_size)
-            B, m1C, m1h, m1w = get_conv_size(self.backbone, input_size)
+            m0C, m0h, m0w = tuple([3] + list(num_inputs)) if isinstance(num_inputs, (list, tuple)) else (3, num_inputs, num_inputs)
+            B, m1C, m1h, m1w = get_conv_size(self.backbone, num_inputs)
 
 
             # recover layer the H1, W1 C1 from the backbone output that can be flatten or using avg max pool
+            # if max or avg pool was used then first we need to get back H1, W1 to each channels then reshape
             self.recover_H1W1C1 = RecoverH1W1C1(num_input_features=num_features_backbone,
                                                  H1=m1h, W1=m1w, C1=m1C,
                                                  from_flatten=implements_flatten(self.backbone))
+            # this part of the code computes the steps configurations to reconstruct the image from the flatten
             m0 = min(m0h, m0w)
             m1 = min(m1h, m1w)
             upsampling_step = math.floor(m0/m1^(1/num_deconv_steps))

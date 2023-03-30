@@ -1,3 +1,4 @@
+from functools import reduce
 import skinbot.skinlogging as logging
 
 import torch
@@ -7,7 +8,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from skinbot.config import Config
 from skinbot.segmentation import UNet
-from skinbot.autoencoders import VariationalAutoEncoder, AutoEncoder
+from skinbot.autoencoders import VariationalAutoEncoder, AutoEncoder, ConvolutionalAutoEncoder
 from skinbot.utils_models import get_backbone
 
 C = Config()
@@ -63,11 +64,13 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
     latent_dims = int(C.config['AUTOENCODER']['latent_dims'])
     layers = eval(C.config['AUTOENCODER']['layers'])
     preserve_shape = bool(C.config['AUTOENCODER']['preserve_shape'])
+    backbone_name = C.config['AUTOENCODER'].get('backbone', None)
+    reconstruct_image = False # initialization changes based on the num_output being a list or an int.
     if isinstance(num_inputs, (list, tuple)) and isinstance(num_outputs, (list, tuple)):
         assert len(num_inputs) == len(num_outputs) and len(num_inputs) < 4, \
-        f'Wrong config.ini. Num_inputs must be the same a num_outputs.' \
-        f' And max only three. Given  inputs {num_inputs},' \
-        f'and outputs {num_outputs}'
+            f'Wrong config.ini. Num_inputs must be the same a num_outputs.' \
+            f' And max only three. Given  inputs {num_inputs},' \
+            f'and outputs {num_outputs}'
         convolutional = True
     elif isinstance(num_inputs, int) and isinstance(num_outputs, int):
         assert num_inputs == num_outputs, \
@@ -75,21 +78,39 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
             f'And max only three. Given inputs {num_inputs}' \
             f'and outputs {num_outputs}'
         convolutional = False
+        reconstruct_image = True
+    elif isinstance(num_inputs, (list, tuple)) and isinstance(num_outputs, int):
+        assert model_name.startswith(
+            'conv'), " if num input has more than one dimension you should use a conv version of the autoencoder"
+        if reduce((lambda x, y: x * y), num_inputs) == num_outputs:
+            logging.warn(
+                'Wrong config.ini. Num of input must be a same number of elements as output? you are trying to '
+                'generate a feature space. That is fine.')
+        convolutional = True
+        reconstruct_image = False
     else:
-        raise ValueError(f'Wrong inp[uts in the config.ini num_inputs na num_outs, try same int int or tuple tuple or list list')
+        raise ValueError(
+            f'Wrong inp[uts in the config.ini num_inputs na num_outs, try same int int or tuple tuple or list list')
         # infers if convolutional activativate
 
     if convolutional:
-        raise ValueError(f'Convolution autoencode not implemented yet')
-        # if model_name == 'ae':
-        #     model = AutoEncoder(in_channels=1, num_classes=num_classes, conditional=False)
-        # elif model_name == 'vae':
-        #     model = AutoEncoder(in_channels=3, num_classes=num_classes, conditional=False)
-        # elif model_name == 'cae':
-        #     model = VariationalAutoEncoder(in_channels=3, num_classes=num_classes, conditional=True)
-        # else:
-        #     # model_name is then CVAE
-        #     model = VariationalAutoEncoder(in_channels=3, num_classes=num_classes, conditional=True)
+
+        if model_name == 'convae':
+            varational=False
+            _num_classes =None
+        elif model_name == 'convvae':
+            varational = True
+            _num_classes =None
+        elif model_name == 'convcvae':
+            varational = True
+            _num_classes = num_classes
+        else:
+            raise ValueError(f"model_name = {model_name} is not defined. Options: convAE, convVAE or convCVAE.")
+        model = ConvolutionalAutoEncoder(
+            num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=num_classes,
+            layers=layers,
+            preserve_shape=False, varational=varational, reconstruct_image_features=reconstruct_image
+        )
     else:
         if model_name == 'ae':
             model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers,
@@ -97,13 +118,14 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
         elif model_name == 'vae':
             model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims,
                                            layers=layers, preserve_shape=preserve_shape)
-        elif model_name == 'cae':
+        elif model_name == 'cvae':
             model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes,
                                 latent_dims=latent_dims, layers=layers, preserve_shape=preserve_shape)
         else:
             # model_name is then CVAE
-            model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes,
-                                           latent_dims=latent_dims, layers=layers, preserve_shape=preserve_shape)
+            # model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes,
+            #                                latent_dims=latent_dims, layers=layers, preserve_shape=preserve_shape)
+            raise ValueError(f"model_name = {model_name} is not defined. Options: ae, vae cae.")
     return model
 
 
@@ -115,7 +137,7 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', *
         model = detection_model(model_name, C.labels.num_classes)
     elif model_name == 'unet':
         model = segmentation_model(model_name, num_classes=C.labels.num_classes, freeze=freeze, **kwargs)
-    elif model_name in ['vae', 'ae', 'cae', 'cvae']:
+    elif model_name in ['vae', 'ae', 'cvae', 'convvae', 'convae', 'convcvae']:
         model = autoencoder_model(model_name, num_classes=C.labels.num_classes, freeze=freeze, **kwargs)
     else:
         raise Exception(f"Model name {model_name} is not defined.")
