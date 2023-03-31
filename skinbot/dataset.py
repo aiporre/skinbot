@@ -18,11 +18,12 @@ from torchvision.io import read_image
 from torchvision.transforms import Compose
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
     DetectionTarget, DetectionPretrained, PretrainedSegmentation, PretrainedMNIST, TargeOneHotfromNum, \
-    PretrainedReconstruction
+    PretrainedReconstruction, PretrainedCIFAR10
 
 from skinbot.config import Config, LabelConstantsDetection
 from torchvision.transforms.functional import rotate
 from torchvision.datasets import MNIST as _MNIST
+from torchvision.datasets import CIFAR10 as _CIFAR10
 
 from skinbot.utils import get_image_rotation
 
@@ -120,6 +121,28 @@ class MNIST(Dataset):
     def __getitem__(self, index):
         return self._dataset[index]
 
+
+class CIFAR10(Dataset):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=5,
+                 test=False,
+                 crop_lesion=False,
+                 fuzzy_labels=False,
+                 detection=False,
+                 transform=None,
+                 target_transform=None):
+        # orchvision.datasets.MNIST(root: str, train: bool = True, transform: Optional[Callable] = None,
+        # target_transform: Optional[Callable] = None, download: bool = False)
+        assert os.path.exists(root_dir), 'root directoyr must exist %s' % root_dir
+        self._dataset = _CIFAR10(root=root_dir, train=~test, transform=transform,
+                               target_transform=target_transform, download=True)
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __getitem__(self, index):
+        return self._dataset[index]
 
 class WoundImages(Dataset):
     def __init__(self, root_dir,
@@ -757,6 +780,10 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
         DatasetClass = MNIST
         T = PretrainedMNIST
         target_transform = TargeOneHotfromNum()
+    elif labels_config.lower() == 'cifar10':
+        DatasetClass = CIFAR10
+        T = PretrainedCIFAR10
+        target_transform = TargeOneHotfromNum()
     else:
         DatasetClass = WoundImages
         T = PretrainedReconstruction
@@ -764,22 +791,22 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
 
     if mode == "all":
         transform = T(test=True)
-        wound_images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
+        images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
         transform = T(test=True)
-        wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
+        images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
                                     transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
         transform = T(test=False)
-        wound_images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
+        images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
                                     transform=transform, target_transform=target_transform)
         shuffle_dataset = True
 
     # wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
-    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, num_workers=4)
+    dataloader = DataLoader(images, batch_size=batch, shuffle=shuffle_dataset, num_workers=4)
 
     return dataloader
 
