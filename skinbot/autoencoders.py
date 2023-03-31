@@ -201,7 +201,7 @@ class ConvolutionalAutoEncoder(nn.Module):
             # needs a reconstruction of original input image.
             # self.global_avg_pool = nn.AdaptiveAvgPool2ddaptive_max_pool2d(output_size=1)
 
-            num_deconv_steps = 6 # todo hardcoded int(C.config['AUTONECODES....
+            num_deconv_steps =  3 # todo hardcoded int(C.config['AUTONECODES....
             m0C, m0h, m0w = tuple(list(num_inputs)) if isinstance(num_inputs, (list, tuple)) else (1, num_inputs, num_inputs)
             _, (B, m1C, m1h, m1w) = get_conv_size(self.backbone, num_inputs)
 

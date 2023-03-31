@@ -27,8 +27,10 @@ def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
 def get_output_size(model, input_size):
     B = 1 # batch_size
     if isinstance(input_size, int):
-        input_size = (B , 3, input_size, input_size)
-    x = torch.randn(input_size)
+        input_size_1 = (B , 3, input_size, input_size)
+    else:
+        input_size_1 = [B] + list(input_size)
+    x = torch.randn(input_size_1)
     y = model(x)
     return tuple(y.shape)
 
@@ -73,7 +75,7 @@ class SmallCNN(nn.Module):
         self.use_global_pool = eval(C.config['MODELS']['use_global_pool'])
 
         if isinstance(input_size, tuple):
-            in_channels = input_size[-1]
+            in_channels = input_size[0]
         else:
             in_channels = 3
         modules = []
