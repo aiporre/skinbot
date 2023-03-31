@@ -108,7 +108,6 @@ class SmallCNN(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        print('backbone ins small cnn > ', x.shape)
         if not self.use_global_pool:
             x = torch.flatten(x, 1)
         else:
@@ -272,8 +271,6 @@ class Reshape(nn.Module):
         super(Reshape, self).__init__()
         self.shape = shape
     def forward(self, x):
-        print('self.shape + . ', self.shape)
-        print('x.shape = > ', x.shape)
         return x.view( [-1] + list(self.shape))
 class RecoverH1W1C1(nn.Module):
     def __init__(self, num_input_features, H1, W1, C1, from_flatten):
