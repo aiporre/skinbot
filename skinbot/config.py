@@ -216,6 +216,41 @@ class LabelConstantsMNIST:
     }
 
     num_classes = len(target_str_to_num)
+
+class LabelConstantsCIFAR10:
+    # 'plane', 'car', 'bird', 'cat',
+    #            'deer', 'dog', 'frog', 'horse', 'ship', 'truck'
+    target_str_to_num = {
+        'plane': 0,
+        'car': 1,
+        'bird': 2,
+        'cat': 2,
+        'deer': 2,
+        'dog': 2,
+        'frog': 6,
+        'horse': 7,
+        'ship': 8,
+        'truck': 9
+    }
+
+    target_weights = {
+        'plane': 1,
+        'car': 1,
+        'bird': 1,
+        'cat': 1,
+        'deer': 1,
+        'dog': 1,
+        'frog': 1,
+        'horse': 1,
+        'ship': 1,
+        'truck': 1
+    }
+
+    fixed_error_labels = {
+        'dummy': 'blue'
+    }
+
+    num_classes = len(target_str_to_num)
 def read_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config.read(config_file)
@@ -249,6 +284,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsDetection
         elif config['DATASET']['labels'].lower() == 'mnist':
             self.labels = LabelConstantsMNIST
+        elif config['DATASET']['labels'].lower() == 'cifar10':
+            self.labels = LabelConstantsCIFAR10
         else:
             raise Exception('Dataset configuration not found.')
 

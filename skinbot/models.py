@@ -108,7 +108,7 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
             raise ValueError(f"model_name = {model_name} is not defined. Options: convAE, convVAE or convCVAE.")
         model = ConvolutionalAutoEncoder(
             num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=num_classes,
-            layers=layers,
+            layers=layers, backbone_name=backbone_name,
             preserve_shape=False, varational=varational, reconstruct_image_features=reconstruct_image
         )
     else:

@@ -7,6 +7,8 @@ import skinbot.skinlogging as logging
 from skinbot.config import Config
 import math
 
+from skinbot.segmentation import pad_to_match
+
 C = Config()
 
 
@@ -33,7 +35,7 @@ def get_output_size(model, input_size):
 def get_conv_size(model, input_size):
     B = 1 # batch_size
     if isinstance(input_size, int):
-        input_size = (B , 3, input_size, input_size)
+        input_size = (B , 1, input_size, input_size)
     x = torch.randn(input_size)
     from collections import OrderedDict
     activation = OrderedDict()
@@ -46,7 +48,8 @@ def get_conv_size(model, input_size):
     for name, module in model.named_modules():
         if hasattr(module, 'forward'):
             module.register_forward_hook(get_activation(name))
-
+    # make a batch
+    x = x.unsqueeze(0)
     y = model(x)
     last_conv_output = None
     last_conv_output_name = None
@@ -67,7 +70,7 @@ class SmallCNN(nn.Module):
         super(SmallCNN, self).__init__()
         conv_layers_dims = eval(C.config['MODELS']['conv_layers'])
         input_size = eval(C.config['MODELS']['input_size'])
-        self.use_global_pool = bool(C.config['MODELS']['use_global_pool'])
+        self.use_global_pool = eval(C.config['MODELS']['use_global_pool'])
 
         if isinstance(input_size, tuple):
             in_channels = input_size[-1]
@@ -75,18 +78,21 @@ class SmallCNN(nn.Module):
             in_channels = 3
         modules = []
         for conv_dim in conv_layers_dims:
+            componets = OrderedDict()
+            componets['conv'] = nn.Conv2d(in_channels, out_channels=conv_dim, kernel_size=3, stride=1, padding=1)
+            componets['batchnorm'] = nn.BatchNorm2d(conv_dim)
+            componets['relu'] = nn.LeakyReLU()
+            componets['maxpool'] = nn.MaxPool2d(2, 2)
             modules.append(
-                nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels=conv_dim,
-                              kernel_size=3, stride=1, padding=1),
-                    nn.BatchNorm2d(conv_dim),
-                    nn.LeakyReLU(),
-                    nn.MaxPool2d(2, 2))
+                nn.Sequential(componets
+                    )
             )
             in_channels = conv_dim
-
-        self.backbone = nn.Sequential(*modules)
-        if self.use_global_pool:
+        backbone_componets = OrderedDict()
+        for i, m in enumerate(modules):
+            backbone_componets[f'layer{i}'] = m
+        self.backbone = nn.Sequential(backbone_componets)
+        if not self.use_global_pool:
             self.num_middle = math.prod(get_output_size(self.backbone, input_size))
         else:
             self.num_middle = conv_layers_dims[-1]
@@ -100,6 +106,7 @@ class SmallCNN(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
+        print('backbone ins small cnn > ', x.shape)
         if not self.use_global_pool:
             x = torch.flatten(x, 1)
         else:
@@ -206,11 +213,11 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
 class Interpolation(nn.Module):
     def __init__(self, size, mode):
         super(Interpolation, self).__init__()
-        self.size = size,
+        self.size = size
         self.mode = mode
 
     def forward(self, x):
-        torch.nn.functional.interpolate(x, self.size, mode=self.mode)
+        return torch.nn.functional.interpolate(x, self.size, mode=self.mode)
 
 
 class DeconvBlock(nn.Module):
@@ -222,28 +229,31 @@ class DeconvBlock(nn.Module):
         #     H, W = input_size, input_size
         # else:
         #     H, W = input_size
-        max_iters = 10
-        iters = 0
+        # max_iters = 10
+        # iters = 0
 
-        def error(s,a,b):
-            return (-s - 2*a + b + 1) != 0 or a<0 or b<0
+        # def error(s,a,b):
+        #     return (-s - 2*a + b + 1) != 0 or a<0 or b<0
 
-        epsilon = 0
-        padding = 0
-        output_padding = 0
-        while error(upsampling_step, padding, output_padding) and iters<max_iters:
-            iters +=1
-            padding = epsilon + 1 - upsampling_step
-            output_padding = 2*epsilon + 1 - upsampling_step
-            epsilon +=1
-        if iters>=max_iters and not error(upsampling_step, padding, output_padding):
-            raise RuntimeError('Cannot find padding and output_padding combinations')
+        # epsilon = 0
+        # padding = 0
+        # output_padding = 0
+        # while error(upsampling_step, padding, output_padding) and iters<max_iters:
+        #     iters +=1
+        #     padding = epsilon + 1 - upsampling_step
+        #     output_padding = 2*epsilon + 1 - upsampling_step
+        #     epsilon +=1
+        # if iters>=max_iters and not error(upsampling_step, padding, output_padding):
+        #     raise RuntimeError('Cannot find padding and output_padding combinations')
 
-        self.upsample = nn.ConvTranspose2d(in_channels, out_channels, 3, stride=upsampling_step,
-                                      padding=padding, output_padding=output_padding)
+        # self.upsample = nn.ConvTranspose2d(in_channels, out_channels, 3, stride=upsampling_step,
+        #                               padding=padding, output_padding=output_padding)
+        self.upsample = nn.Conv2d(in_channels, out_channels, kernel_size=2, stride=upsampling_step)
+        self.upsample_step = upsampling_step
 
     def forward(self, x):
-        return self.upsample(x)
+        H_expected, W_expected = x.shape[-2]*self.upsample_step, x.shape[-1]*self.upsample_step
+        return pad_to_match(self.upsample(x), H_expected, W_expected)
 def implements_flatten(model):
     if isinstance(model, models.RegNet):
         return False
@@ -258,9 +268,11 @@ def implements_flatten(model):
 class Reshape(nn.Module):
     def __init__(self, shape):
         super(Reshape, self).__init__()
-        self.shape
+        self.shape = shape
     def forward(self, x):
-        return torch.reshape(x, self.shape)
+        print('self.shape + . ', self.shape)
+        print('x.shape = > ', x.shape)
+        return x.view( [-1] + list(self.shape))
 class RecoverH1W1C1(nn.Module):
     def __init__(self, num_input_features, H1, W1, C1, from_flatten):
         super(RecoverH1W1C1, self).__init__()
