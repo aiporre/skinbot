@@ -1,5 +1,6 @@
 import math
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -192,6 +193,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                                        num_classes=num_classes,
                                        layers=layers,
                                        preserve_shape=preserve_shape)
+        self.conditional = self.autoencoder.conditional
 
         self.reconstruct_image_features = reconstruct_image_features
 
@@ -199,9 +201,9 @@ class ConvolutionalAutoEncoder(nn.Module):
             # needs a reconstruction of original input image.
             # self.global_avg_pool = nn.AdaptiveAvgPool2ddaptive_max_pool2d(output_size=1)
 
-            num_deconv_steps = 3 # todo hardcoded int(C.config['AUTONECODES....
-            m0C, m0h, m0w = tuple([3] + list(num_inputs)) if isinstance(num_inputs, (list, tuple)) else (3, num_inputs, num_inputs)
-            B, m1C, m1h, m1w = get_conv_size(self.backbone, num_inputs)
+            num_deconv_steps = 6 # todo hardcoded int(C.config['AUTONECODES....
+            m0C, m0h, m0w = tuple(list(num_inputs)) if isinstance(num_inputs, (list, tuple)) else (1, num_inputs, num_inputs)
+            _, (B, m1C, m1h, m1w) = get_conv_size(self.backbone, num_inputs)
 
 
             # recover layer the H1, W1 C1 from the backbone output that can be flatten or using avg max pool
@@ -212,29 +214,29 @@ class ConvolutionalAutoEncoder(nn.Module):
             # this part of the code computes the steps configurations to reconstruct the image from the flatten
             m0 = min(m0h, m0w)
             m1 = min(m1h, m1w)
-            upsampling_step = math.floor(m0/m1^(1/num_deconv_steps))
+            upsampling_step = math.floor((m0/m1)**(1/num_deconv_steps))
             upsampling_modules = []
             num_channels = m1C
             output_size = (m1h,m1w)
             for i in range(num_deconv_steps):
                 upsampling_modules.append(DeconvBlock(num_channels, num_channels//2, upsampling_step))
                 # update the output calculation
-                output_size = (m1h*upsampling_step, m1w*upsampling_step)
+                output_size = (output_size[0]*upsampling_step, output_size[1]*upsampling_step)
                 num_channels = num_channels//2
-                if num_channels//num_channels < 3:
+                if num_channels//2 < 3:
                     break
             self.deconv = nn.Sequential(*upsampling_modules)
-            self.interpolation = Interpolation((m0h, m0w), mode='linear')
+            self.interpolation = Interpolation((m0h, m0w), mode='nearest')
             self.output_layer = nn.Conv2d(num_channels, 3, 1)
 
-    def forward(self, x):
+    def forward(self, x, y=None):
         h = self.backbone(x)
-        h_hat = self.autoencoder(h)
+        h_hat = self.autoencoder(h, y)
         if not self.reconstruct_image_features:
-           h_hat = self.recover_H1W1C1(h_hat)
-           h_hat = self.deconv(h_hat)
-           h_hat = self.interpolation(h_hat)
-           h_hat = self.output_layer(h_hat)
+            h_hat = self.recover_H1W1C1(h_hat)
+            h_hat = self.deconv(h_hat)
+            h_hat = self.interpolation(h_hat)
+            h_hat = self.output_layer(h_hat)
 
         return h_hat
 
