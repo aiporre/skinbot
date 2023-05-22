@@ -255,8 +255,9 @@ class DeconvBlock(nn.Module):
     def forward(self, x):
         H_expected, W_expected = x.shape[-2]*self.upsample_step, x.shape[-1]*self.upsample_step
         return pad_to_match(self.upsample(x), H_expected, W_expected)
+
 def implements_flatten(model):
-    if isinstance(model, models.RegNet):
+    if isinstance(model, models.ResNet):
         return False
     elif isinstance(model, SmallCNN):
         return not model.use_global_pool

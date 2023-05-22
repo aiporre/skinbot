@@ -148,7 +148,7 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         x_hat = torch.sigmoid(x_hat)
         if hasattr(model, 'compute_kl'):
             gamma = 50. # 100.0 #1.0
-            beta = 0.1 #. # .
+            beta = 0.001 #. # .
             reconstruction_loss = gamma*((x - x_hat) ** 2).mean() #.flatten(start_dim=1).mean(dim=1).mean(dim=0)
             kl_div = beta*model.compute_kl()
             loss = reconstruction_loss + kl_div
