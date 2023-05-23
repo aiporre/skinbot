@@ -278,7 +278,7 @@ class WoundImages(Dataset):
         if os.path.exists(detection_json_path) and os.path.exists(detection_npy_path):
             with open(detection_json_path, 'r') as f:
                 detection_json = json.load(f)
-            masks = [_ for _ in np.load(detection_npy_path)]
+            masks = [m.astype('int') for m in  np.load(detection_npy_path)]
             boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'], \
                 detection_json['areas'], detection_json['iscrowd']
         else:
@@ -738,7 +738,7 @@ def get_dataloaders_detection(config, batch, mode='all', fold_iteration=0, targe
         shuffle_dataset = True
 
     wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
-    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate)
+    dataloader = DataLoader(wound_images, batch_size=batch, shuffle=shuffle_dataset, collate_fn=detection_collate, num_workers=4)
 
     return dataloader
 
