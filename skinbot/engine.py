@@ -118,9 +118,9 @@ def reduce_dict(loss_dict):
     return reduced_losses
 
 
-def get_loss_keys(model, dataloader):
+def get_loss_keys(model, dataloader, device):
     batch = next(iter(dataloader))
-    x, y = prepare_batch(batch)
+    x, y = prepare_batch(batch, device)
     model.train()
     loss_dict = model(x, y)
     loss_dict_reduced = reduce_dict(loss_dict)
@@ -264,24 +264,35 @@ def create_detection_trainer(model, optimizer, device=None):
     engine.state.optimizer = optimizer
     return engine
 
-
 def create_detection_evaluator(model, device=None):
     def update_model(engine, batch):
         model.eval()
-        x, y = prepare_batch(batch, device=device)
-        x_process = copy.deepcopy(x)
+        model.to(device='cpu')
+        x, y = prepare_batch(batch, device='cpu')
+        # x_process = copy.deepcopy(x)
 
         if torch.has_cuda:
             torch.cuda.synchronize()
         with torch.no_grad():
-            y_pred = model(x_process)
 
-        y_pred = [{k: v.to(device) for k, v in t.items()} for t in y_pred]
+            print('--------------------------------------')
+            print('--------------------------------------')
+            print('--------------------------------------')
+            print('================= > make one prediction')
+            print('--------------------------------------')
+            print('--------------------------------------')
+            print('--------------------------------------')
+            y_pred = model(x)
+
+        y_pred = [{k: v.to('cpu') for k, v in t.items()} for t in y_pred]
 
         res = {yy["image_id"].item(): yy_pred for yy, yy_pred in zip(y, y_pred)}
-        engine.state.coco_evaluator.update(res)
+        with torch.no_grad():
+            engine.state.coco_evaluator.update(res)
 
-        x_process = y_pred = None
+        #x_process = y_pred = None
+        y_pred = None
+        model.to(device)
 
         return x, y, res
 
@@ -735,9 +746,9 @@ def configure_engines_detection(target_mode,
     from itertools import chain
 
     # configure evaluator coco api wrapper functions
-    test_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(test_dataloader)))
+    test_dataset = test_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(test_dataloader))
     coco_api_test_dataset = convert_to_coco_api(test_dataset)
-    train_dataset = list(chain.from_iterable(zip(*batch) for batch in iter(train_dataloader)))
+    train_dataset = train_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(train_dataloader))
     coco_api_train_dataset = convert_to_coco_api(train_dataset)
 
     @evaluator.on(Events.COMPLETED)
@@ -768,7 +779,7 @@ def configure_engines_detection(target_mode,
         return ioutypes
 
     # configure logging progress bar
-    loss_keys = get_loss_keys(model, train_dataloader)
+    loss_keys = get_loss_keys(model, train_dataloader, device)
 
     class RATrans:
         def __init__(self, k):

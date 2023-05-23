@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torchvision import models
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 
 from skinbot.config import Config
 from skinbot.segmentation import UNet
@@ -46,6 +47,12 @@ def detection_model(model_name, num_classes, pretrained=True):
         # get number of input features for the classifier
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         # replace the pre-trained head with a new one
+        print('adsfafasfaj---=-=23482839483048203480295780270    dir(of asmk preidiotoin')
+        print('potential inchanles = ', model.roi_heads.mask_predictor.conv5_mask.in_channels)
+        print('potential reducion = dim_reduced, ' , model.roi_heads.mask_predictor.conv5_mask.out_channels)
+        in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
+        dim_reduced_mask = model.roi_heads.mask_predictor.conv5_mask.out_channels
+        model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, dim_reduced_mask, num_classes)
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     else:
         raise ValueError(
