@@ -226,7 +226,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                 if num_channels//2 < 3:
                     break
             self.deconv = nn.Sequential(*upsampling_modules)
-            self.interpolation = Interpolation((m0h, m0w), mode='nearest')
+            self.interpolation = Interpolation((m0h, m0w), mode='bilinear')
             self.output_layer = nn.Conv2d(num_channels, 3, 1)
 
     def forward(self, x, y=None):
