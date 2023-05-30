@@ -13,7 +13,7 @@ from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator, get_best_iteration, create_segmentation_trainer, \
     create_segmentation_evaluator, create_autoencoder_trainer, create_autoencoder_evaluator, get_last_checkpoint
-from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam, plot_latent_space
+from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam, plot_latent_space, plot_detection
 from skinbot.models import get_model
 import skinbot.skinlogging as logging
 # from skinbot.transformers import num_classes, target_str_to_num
@@ -121,6 +121,10 @@ def main(best_or_last='best',
             return evaluation_actions_reconstruction(C, config, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader,
                                                      device, best_or_last)
+        elif target_mode == 'detection':
+            return evaluation_actions_detection(C, config, evaluator, external_data, fold, model, model_name,
+                                                     model_path, target_mode, test_dataloader, train_dataloader,
+                                                     device, best_or_last)
 
         else:
             raise Exception(f"Target mode = {target_mode} doen't have an evalution action.")
@@ -157,6 +161,25 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
                 logging.info('last model loaded: %s' % model_path)
     plot_latent_space(model, num_classes=num_classes, device=device, data_loader=test_dataloader, save=save_fig,
                       dim_red=None)
+    return 0
+
+def evaluation_actions_detection(C, config, evaluator, external_data, fold, model, model_name, model_path,
+                                        target_mode, test_dataloader, train_dataloader, device, best_or_last):
+    logging.info('Running evaluations Train and test (in that order).')
+    evaluator.run(train_dataloader)
+    logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
+    evaluator.run(test_dataloader)
+    logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
+    # plotting one detection result
+    test_dataset = test_dataloader.dataset
+    # get one image each
+    image_test, label_test = test_dataset[0]
+    # get the prediction
+    model.eval()
+    with torch.no_grad():
+        pred_test = model(image_test.unsqueeze(0).to(device))
+    # plot the image and the prediction
+    plot_detection(image_test, pred_test, label_test, C.labels.target_str_to_num, save=True, show=False, mask=False)
     return 0
 
 
