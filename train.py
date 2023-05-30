@@ -122,7 +122,7 @@ def main(best_or_last='best',
                                                      model_path, target_mode, test_dataloader, train_dataloader,
                                                      device, best_or_last)
         elif target_mode == 'detection':
-            return evaluation_actions_detection(C, config, evaluator, external_data, fold, model, model_name,
+            return evaluation_actions_detection(C, config, trainer, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader,
                                                      device, best_or_last)
 
@@ -163,11 +163,13 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
                       dim_red=None)
     return 0
 
-def evaluation_actions_detection(C, config, evaluator, external_data, fold, model, model_name, model_path,
+def evaluation_actions_detection(C, config, trainer, evaluator, external_data, fold, model, model_name, model_path,
                                         target_mode, test_dataloader, train_dataloader, device, best_or_last):
     logging.info('Running evaluations Train and test (in that order).')
+    evaluator.state.coco_evaluator = trainer.state.get_coco_evaluator()
     evaluator.run(train_dataloader)
     logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
+    evaluator.state.coco_evaluator = evaluator.state.get_coco_evaluator()
     evaluator.run(test_dataloader)
     logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
     # plotting one detection result

@@ -751,6 +751,13 @@ def configure_engines_detection(target_mode,
     train_dataset = train_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(train_dataloader))
     coco_api_train_dataset = convert_to_coco_api(train_dataset)
 
+    def get_coco_evaluator_train():
+        return CocoEvaluator(coco_api_train_dataset, infer_ioutypes_coco_api(model))
+    def get_coco_evaluator_test():
+        return CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
+    trainer.state.get_coco_evaluator = get_coco_evaluator_train
+    evaluator.state.get_coco_evaluator = get_coco_evaluator_test
+
     @evaluator.on(Events.COMPLETED)
     def on_evaluation_completed(engine):
         # gather the stats from all processes
@@ -809,7 +816,7 @@ def configure_engines_detection(target_mode,
     @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_training_results(engine):
         logging.info('Running training evaluation (detection): ')
-        evaluator.state.coco_evaluator = CocoEvaluator(coco_api_train_dataset, infer_ioutypes_coco_api(model))
+        evaluator.state.coco_evaluator = trainer.state.get_coco_evaluator()
         evaluator.run(train_dataloader)
 
         metrics = evaluator.state.metrics
@@ -823,7 +830,7 @@ def configure_engines_detection(target_mode,
     @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_validation_results(engine):
         logging.info("Running validation evaluation (detection)...")
-        evaluator.state.coco_evaluator = CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
+        evaluator.state.coco_evaluator =  evaluator.state.get_coco_evaluator() # CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
         evaluator.run(test_dataloader)
         metrics = evaluator.state.metrics
         # # print(f"Training Results - Epoch: {trainer.state.epoch}  Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['nll']:.2f}")
