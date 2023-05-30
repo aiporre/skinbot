@@ -279,11 +279,13 @@ if __name__ == "__main__":
     #      model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=model_path)
 
     # training detection
-    # main(target_mode='detection',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='maskrcnn',
-    #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    #main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
+    #     freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
+    main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='fasterresnet50',
+         freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
     # training of autoencoders
-    main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=128, lr=1E-03, model_name='convae',
-         freeze='No', optimizer='ADAM', only_eval=False)
+    # main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=16, lr=1E-03, model_name='cvae',
+    #      freeze='No', optimizer='ADAM', only_eval=False)
 
     print('this is created from the browser :)')
