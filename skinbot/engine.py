@@ -232,6 +232,8 @@ def create_detection_trainer(model, optimizer, device=None):
 
         x, y = copy.deepcopy(batch)
         x_process, y_process = prepare_batch(batch, device=device)
+        # print('y_process ; ' , y_process[0]['masks'].shape)
+        # print('x_process: ', x_process) 
 
         loss_dict = model(x_process, y_process)
         loss_sum = sum(value for value in loss_dict.values())
@@ -269,22 +271,21 @@ def create_detection_evaluator(model, device=None):
         model.eval()
         model.to(device='cpu')
         x, y = prepare_batch(batch, device='cpu')
+        # x, y = prepare_batch(batch, device=device)
         # x_process = copy.deepcopy(x)
 
         if torch.has_cuda:
             torch.cuda.synchronize()
         with torch.no_grad():
-
-            print('--------------------------------------')
-            print('--------------------------------------')
-            print('--------------------------------------')
-            print('================= > make one prediction')
-            print('--------------------------------------')
-            print('--------------------------------------')
-            print('--------------------------------------')
             y_pred = model(x)
 
         y_pred = [{k: v.to('cpu') for k, v in t.items()} for t in y_pred]
+        #y_pred = [{k: v.to(device) for k, v in t.items()} for t in y_pred]
+        #  print('predicion')
+        #  print(y_pred[0])
+        #  print('input value')
+        #  print(y[0])
+        #  raise Exception('stop')
 
         res = {yy["image_id"].item(): yy_pred for yy, yy_pred in zip(y, y_pred)}
         with torch.no_grad():
