@@ -205,3 +205,48 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
     if save:
         fig.savefig('latent_space.png')
     return fig, ax
+
+
+def plot_detection(image, pred, label, all_titles_labels, save=True):
+    import matplotlib.colors as mcolors
+    import matplotlib.patches as patches
+    colors = list(mcolors.TABLEAU_COLORS.items())
+    fig, ax = plt.subplots(2, 2, figsize=(10, 5))
+    ax[0,0].imshow(image)
+    # iterate over boxes in label
+    boxes = label['boxes'].cpu().numpy()
+    labels = label['labels'].cpu().numpy()
+    num_to_str = {v:k for k, v in all_titles_labels.items()}
+    for i, box in enumerate(boxes):
+        # print('box', box)
+        x1, y1, x2, y2 = box
+        label_i = labels[i]
+        rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
+        ax[0,0].add_patch(rect)
+        # write the label inside the box
+        rx, ry = rect.get_xy()
+        cx = rx + rect.get_width()/2.0
+        cy = ry + rect.get_height()/8.0
+        text = ax[0,0].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
+        text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+
+    # do the same for the prediction
+    boxes = pred['boxes'].cpu().numpy()
+    labels = pred['labels'].cpu().numpy()
+    ax[0,0].set_title('inputs')
+    for i, box in enumerate(boxes):
+        # print('box', box)
+        x1, y1, x2, y2 = box
+        label_i = labels[i]
+        rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
+        ax[0,1].add_patch(rect)
+        # write the label inside the box
+        rx, ry = rect.get_xy()
+        cx = rx + rect.get_width()/2.0
+        cy = ry + rect.get_height()/8.0
+        text = ax[0,1].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
+        text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+    ax[0,1].set_title('predictions')
+    if save:
+        fig.savefig('detection.png')
+    return fig, ax
