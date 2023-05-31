@@ -293,9 +293,11 @@ class WoundImages(Dataset):
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
 
-            analyse_mask(mask, lesion_ids, LabelConstantsDetection.target_str_to_num['lesion'])
+            #analyse_mask(mask, lesion_ids, LabelConstantsDetection.target_str_to_num['lesion'])
             skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
             skin_ids.pop('blandSkin', None)
+            # joint skin ids and lesion ids
+            skin_ids.update(lesion_ids)
             analyse_mask(mask, skin_ids, LabelConstantsDetection.target_str_to_num['lesion'])
 
             if len(boxes) == 0:
@@ -951,8 +953,8 @@ def get_boxes(mask, obj_ids, obj_label_id):
         xmin, xmax = (np.min(pos[1]), np.max(pos[1]))
         ymin, ymax = (np.min(pos[0]), np.max(pos[0]))
         area = (xmax - xmin) * (ymax - ymin)
-        if area < 224 * 224:
-            continue
+        # if area < 224 * 224:
+        #     continue
         areas.append(area)
         boxes.append([xmin, ymin, xmax, ymax])
         labels.append(obj_label_id)

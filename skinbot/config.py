@@ -167,13 +167,13 @@ class LabelConstantsDemo:
 
 class LabelConstantsDetection:
     target_str_to_num = {
-        'background': 0,
-        'lesion': 1,
-        'scale': 2
+        # 'background': 0,
+        'lesion': 0,
+        'scale': 1
     }
 
     target_weights = {
-        'background': 1,
+        # 'background': 1,
         'lesion': 1,
         'scale': 1
     }
