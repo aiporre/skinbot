@@ -166,22 +166,25 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
 def evaluation_actions_detection(C, config, trainer, evaluator, external_data, fold, model, model_name, model_path,
                                         target_mode, test_dataloader, train_dataloader, device, best_or_last):
     logging.info('Running evaluations Train and test (in that order).')
-    evaluator.state.coco_evaluator = trainer.state.get_coco_evaluator()
-    evaluator.run(train_dataloader)
-    logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
-    evaluator.state.coco_evaluator = evaluator.state.get_coco_evaluator()
-    evaluator.run(test_dataloader)
-    logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
+    # evaluator.state.coco_evaluator = trainer.state.get_coco_evaluator()
+    # evaluator.run(train_dataloader)
+    # logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
+    # evaluator.state.coco_evaluator = evaluator.state.get_coco_evaluator()
+    # evaluator.run(test_dataloader)
+    # logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
     # plotting one detection result
     test_dataset = test_dataloader.dataset
     # get one image each
-    image_test, label_test = test_dataset[0]
-    # get the prediction
-    model.eval()
-    with torch.no_grad():
-        pred_test = model(image_test.unsqueeze(0).to(device))
-    # plot the image and the prediction
-    plot_detection(image_test, pred_test, label_test, C.labels.target_str_to_num, save=True, show=False, mask=False)
+    import random
+    for u in range(5):
+        N = random.randint(0, len(test_dataset))
+        image_test, label_test = test_dataset[N]
+        # get the prediction
+        model.eval()
+        with torch.no_grad():
+            pred_test = model(image_test.unsqueeze(0).to(device))
+        # plot the image and the prediction
+        plot_detection(image_test, pred_test, label_test, C.labels.target_str_to_num, save=True, show=False, mask=False, suffix=f'{u}')
     return 0
 
 
@@ -307,8 +310,8 @@ if __name__ == "__main__":
     #main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
     #     freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
-    main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='fasterresnet50',
-         freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
+    main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
+         freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, best_or_last='last')
     # training of autoencoders
     # main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=16, lr=1E-03, model_name='cvae',
     #      freeze='No', optimizer='ADAM', only_eval=False)

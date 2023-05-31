@@ -207,11 +207,14 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
     return fig, ax
 
 
-def plot_detection(image, pred, label, all_titles_labels, save=True):
+def plot_detection(image, pred, label, all_titles_labels, save=True, show=False, mask=False, suffix=''):
     import matplotlib.colors as mcolors
     import matplotlib.patches as patches
+    print(label)
+    pred = pred[0]
     colors = list(mcolors.TABLEAU_COLORS.items())
     fig, ax = plt.subplots(2, 2, figsize=(10, 5))
+    image = image.cpu().numpy().transpose(1,2,0)
     ax[0,0].imshow(image)
     # iterate over boxes in label
     boxes = label['boxes'].cpu().numpy()
@@ -230,10 +233,11 @@ def plot_detection(image, pred, label, all_titles_labels, save=True):
         text = ax[0,0].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
         text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
 
+    ax[0,0].set_title('inputs')
     # do the same for the prediction
     boxes = pred['boxes'].cpu().numpy()
     labels = pred['labels'].cpu().numpy()
-    ax[0,0].set_title('inputs')
+    ax[0,1].imshow(image)
     for i, box in enumerate(boxes):
         # print('box', box)
         x1, y1, x2, y2 = box
@@ -248,5 +252,5 @@ def plot_detection(image, pred, label, all_titles_labels, save=True):
         text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
     ax[0,1].set_title('predictions')
     if save:
-        fig.savefig('detection.png')
+        fig.savefig(f'detection_{suffix}.png')
     return fig, ax
