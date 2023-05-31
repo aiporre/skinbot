@@ -210,47 +210,118 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
 def plot_detection(image, pred, label, all_titles_labels, save=True, show=False, mask=False, suffix=''):
     import matplotlib.colors as mcolors
     import matplotlib.patches as patches
-    print(label)
     pred = pred[0]
     colors = list(mcolors.TABLEAU_COLORS.items())
-    fig, ax = plt.subplots(2, 2, figsize=(10, 5))
-    image = image.cpu().numpy().transpose(1,2,0)
-    ax[0,0].imshow(image)
-    # iterate over boxes in label
-    boxes = label['boxes'].cpu().numpy()
-    labels = label['labels'].cpu().numpy()
-    num_to_str = {v:k for k, v in all_titles_labels.items()}
-    for i, box in enumerate(boxes):
-        # print('box', box)
-        x1, y1, x2, y2 = box
-        label_i = labels[i]
-        rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
-        ax[0,0].add_patch(rect)
-        # write the label inside the box
-        rx, ry = rect.get_xy()
-        cx = rx + rect.get_width()/2.0
-        cy = ry + rect.get_height()/8.0
-        text = ax[0,0].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
-        text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+    image = image.cpu().numpy().transpose(1, 2, 0)
 
-    ax[0,0].set_title('inputs')
-    # do the same for the prediction
-    boxes = pred['boxes'].cpu().numpy()
-    labels = pred['labels'].cpu().numpy()
-    ax[0,1].imshow(image)
-    for i, box in enumerate(boxes):
-        # print('box', box)
-        x1, y1, x2, y2 = box
-        label_i = labels[i]
-        rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
-        ax[0,1].add_patch(rect)
-        # write the label inside the box
-        rx, ry = rect.get_xy()
-        cx = rx + rect.get_width()/2.0
-        cy = ry + rect.get_height()/8.0
-        text = ax[0,1].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
-        text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
-    ax[0,1].set_title('predictions')
+    def hex_to_rgb(hex_code):
+        hex_code = hex_code.strip('#')
+        red, green, blue = int(hex_code[:2], 16), int(hex_code[2:4], 16), int(hex_code[4:], 16)
+        return (red, green, blue)
+
+    if not mask:
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        ax[0,0].imshow(image)
+        # iterate over boxes in label
+        boxes = label['boxes'].cpu().numpy()
+        labels = label['labels'].cpu().numpy()
+        num_to_str = {v:k for k, v in all_titles_labels.items()}
+        for i, box in enumerate(boxes):
+            # print('box', box)
+            x1, y1, x2, y2 = box
+            label_i = labels[i]
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
+            ax[0,0].add_patch(rect)
+            # write the label inside the box
+            rx, ry = rect.get_xy()
+            cx = rx + rect.get_width()/2.0
+            cy = ry + rect.get_height()/8.0
+            text = ax[0,0].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
+            text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+
+        ax[0,0].set_title('inputs')
+        # do the same for the prediction
+        boxes = pred['boxes'].cpu().numpy()
+        labels = pred['labels'].cpu().numpy()
+        ax[0,1].imshow(image)
+        for i, box in enumerate(boxes):
+            # print('box', box)
+            x1, y1, x2, y2 = box
+            label_i = labels[i]
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
+            ax[0,1].add_patch(rect)
+            # write the label inside the box
+            rx, ry = rect.get_xy()
+            cx = rx + rect.get_width()/2.0
+            cy = ry + rect.get_height()/8.0
+            text = ax[0,1].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
+            text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+        ax[0,1].set_title('predictions')
+    else:
+        fig, ax = plt.subplots(2, 2, figsize=(10, 5))
+        ax[0,0].imshow(image)
+        # iterate over boxes in label
+        boxes = label['boxes'].cpu().numpy()
+        labels = label['labels'].cpu().numpy()
+        masks = label['masks'].cpu().numpy()
+        num_to_str = {v:k for k, v in all_titles_labels.items()}
+        for i, box in enumerate(boxes):
+            # print('box', box)
+            x1, y1, x2, y2 = box
+            label_i = labels[i]
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
+            ax[0,0].add_patch(rect)
+            # write the label inside the box
+            rx, ry = rect.get_xy()
+            cx = rx + rect.get_width()/2.0
+            cy = ry + rect.get_height()/8.0
+            text = ax[0,0].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
+            text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+        ax[0,0].set_title('inputs')
+        # plot masks for the input
+        for i, mask in enumerate(masks):
+            mask = (mask.squeeze()>0.5).astype('float32')
+            label_i = labels[i]
+            color_vect = hex_to_rgb(colors[label_i])
+            mask_color = np.zeros((mask.shape[0], mask.shape[1], 3))
+            mask_color[:,:,0] = mask*color_vect[0]
+            mask_color[:,:,1] = mask*color_vect[1]
+            mask_color[:,:,2] = mask*color_vect[2]
+            ax[1,0].imshow(image, cmap='gray')
+            ax[1,0].imshow(mask_color, alpha=0.5)
+            ax[1,0].set_title('masks')
+
+        # do the same for the prediction
+        boxes = pred['boxes'].cpu().numpy()
+        labels = pred['labels'].cpu().numpy()
+        masks = pred['masks'].cpu().numpy()
+        ax[0,1].imshow(image)
+        for i, box in enumerate(boxes):
+            # print('box', box)
+            x1, y1, x2, y2 = box
+            label_i = labels[i]
+            rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor=colors[label_i][1], facecolor='none')
+            ax[0,1].add_patch(rect)
+            # write the label inside the box
+            rx, ry = rect.get_xy()
+            cx = rx + rect.get_width()/2.0
+            cy = ry + rect.get_height()/8.0
+            text = ax[0,1].annotate(num_to_str[label_i], (cx, cy), color='w', weight='bold', ha='center', va='center', size=8)
+            text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
+        ax[0,1].set_title('predictions')
+
+        # plot masks for the input
+        ax[1, 1].imshow(image, cmap='gray')
+        for i, mask in enumerate(masks):
+            mask = (mask.squeeze() > 0.5).astype('float32')
+            label_i = labels[i]
+            color_vect = hex_to_rgb(colors[label_i])
+            mask_color = np.zeros((mask.shape[0], mask.shape[1], 3))
+            mask_color[:, :, 0] = mask * color_vect[0]
+            mask_color[:, :, 1] = mask * color_vect[1]
+            mask_color[:, :, 2] = mask * color_vect[2]
+            ax[1, 1].imshow(mask_color, alpha=0.5)
+        ax[1, 1].set_title('pred masks')
     if save:
         fig.savefig(f'detection_{suffix}.png')
     return fig, ax
