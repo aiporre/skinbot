@@ -207,12 +207,14 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
     return fig, ax
 
 
-def plot_detection(image, pred, label, all_titles_labels, save=True, show=False, mask=False, suffix=''):
+def plot_detection(image, pred, label, all_titles_labels, save=True, show=False, mask=False, suffix='', fname=''):
     import matplotlib.colors as mcolors
     import matplotlib.patches as patches
     pred = pred[0]
     colors = list(mcolors.TABLEAU_COLORS.items())
     image = image.cpu().numpy().transpose(1, 2, 0)
+    print('colors')
+    print(colors[0])
 
     def hex_to_rgb(hex_code):
         hex_code = hex_code.strip('#')
@@ -221,6 +223,7 @@ def plot_detection(image, pred, label, all_titles_labels, save=True, show=False,
 
     if not mask:
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        fig.suptitle(f'{fname}')
         ax[0,0].imshow(image)
         # iterate over boxes in label
         boxes = label['boxes'].cpu().numpy()
@@ -259,6 +262,7 @@ def plot_detection(image, pred, label, all_titles_labels, save=True, show=False,
         ax[0,1].set_title('predictions')
     else:
         fig, ax = plt.subplots(2, 2, figsize=(10, 5))
+        fig.suptitle(f'{fname}')
         ax[0,0].imshow(image)
         # iterate over boxes in label
         boxes = label['boxes'].cpu().numpy()
@@ -279,17 +283,19 @@ def plot_detection(image, pred, label, all_titles_labels, save=True, show=False,
             text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
         ax[0,0].set_title('inputs')
         # plot masks for the input
+        ax[1,0].imshow(image)
         for i, mask in enumerate(masks):
-            mask = (mask.squeeze()>0.5).astype('float32')
+            mask = (mask.squeeze()>0.5).astype('float')
             label_i = labels[i]
-            color_vect = hex_to_rgb(colors[label_i])
-            mask_color = np.zeros((mask.shape[0], mask.shape[1], 3))
+            color_vect = hex_to_rgb(colors[label_i][1])
+            mask_color = np.ones((mask.shape[0], mask.shape[1], 4), dtype='uint8')
             mask_color[:,:,0] = mask*color_vect[0]
             mask_color[:,:,1] = mask*color_vect[1]
             mask_color[:,:,2] = mask*color_vect[2]
-            ax[1,0].imshow(image, cmap='gray')
-            ax[1,0].imshow(mask_color, alpha=0.5)
-            ax[1,0].set_title('masks')
+            mask_color[:,:,3] = (127*mask).astype('uint8')
+            ax[1,0].imshow(mask_color)
+            ax[1,0].set_facecolor((1.0, 1.0, 1.0, 0.0))
+        ax[1,0].set_title('masks')
 
         # do the same for the prediction
         boxes = pred['boxes'].cpu().numpy()
@@ -311,16 +317,18 @@ def plot_detection(image, pred, label, all_titles_labels, save=True, show=False,
         ax[0,1].set_title('predictions')
 
         # plot masks for the input
-        ax[1, 1].imshow(image, cmap='gray')
+        ax[1, 1].imshow(image)
         for i, mask in enumerate(masks):
-            mask = (mask.squeeze() > 0.5).astype('float32')
+            mask = (mask.squeeze() > 0.5).astype('float')
             label_i = labels[i]
-            color_vect = hex_to_rgb(colors[label_i])
-            mask_color = np.zeros((mask.shape[0], mask.shape[1], 3))
-            mask_color[:, :, 0] = mask * color_vect[0]
-            mask_color[:, :, 1] = mask * color_vect[1]
-            mask_color[:, :, 2] = mask * color_vect[2]
-            ax[1, 1].imshow(mask_color, alpha=0.5)
+            color_vect = hex_to_rgb(colors[label_i][1])
+            mask_color = np.ones((mask.shape[0], mask.shape[1], 4), dtype='uint8')
+            mask_color[:,:,0] = mask*color_vect[0]
+            mask_color[:,:,1] = mask*color_vect[1]
+            mask_color[:,:,2] = mask*color_vect[2]
+            mask_color[:,:,3] = (127*mask).astype('uint8')
+            ax[1,1].imshow(mask_color)
+            ax[1,1].set_facecolor((1.0, 1.0, 1.0, 0.0))
         ax[1, 1].set_title('pred masks')
     if save:
         fig.savefig(f'detection_{suffix}.png')

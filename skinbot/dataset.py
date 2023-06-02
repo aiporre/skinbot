@@ -293,17 +293,19 @@ class WoundImages(Dataset):
                 areas.extend(_areas)
                 iscrowd.extend([0] * len(_boxes))
 
-            #analyse_mask(mask, lesion_ids, LabelConstantsDetection.target_str_to_num['lesion'])
-            skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
-            skin_ids.pop('blandSkin', None)
+            print('analyze lesio')
+            analyse_mask(mask, lesion_ids, LabelConstantsDetection.target_str_to_num['lesion'])
+            #skin_ids = get_ids_by_categorie(self.root_dir, 'skin')
+            #skin_ids.pop('blandSkin', None)
             # joint skin ids and lesion ids
-            skin_ids.update(lesion_ids)
-            analyse_mask(mask, skin_ids, LabelConstantsDetection.target_str_to_num['lesion'])
+            #skin_ids.update(lesion_ids)
+            #analyse_mask(mask, skin_ids, LabelConstantsDetection.target_str_to_num['lesion'])
 
             if len(boxes) == 0:
                 logging.warn(f'Warning: No lesions found in image {self.image_fnames[index]}')
             # getting the scale mask from the image
             scale_id = {"scale": 13}
+            print('analyze sacles')
             analyse_mask(mask, scale_id, LabelConstantsDetection.target_str_to_num['scale'])
             # save mask in npy file
             np.save(detection_npy_path, np.array(masks))
@@ -942,21 +944,32 @@ def get_boxes(mask, obj_ids, obj_label_id):
     for name, id in obj_ids.items():
         mask_binary += lesion_mask_rgb_to_binary(mask, id)
     # get the bounding boxes
-    mask_binary = (mask_binary > 0.5).numpy().astype(np.uint8)
+    mask_binary = (mask_binary > 0.5).numpy().astype(bool)
+    from skimage import morphology
+    mask_binary = morphology.remove_small_objects(mask_binary, min_size=50)
+    # dilation of small objects not removed
+    selem = morphology.disk(radius=30)
+    mask_binary = morphology.binary_dilation(mask_binary, selem)
+    # convert to int 
+    mask_binary = mask_binary.astype('uint8') 
     # get the boxes
     # num_components, components_joint= cv2.connectedComponents(mask_binary)
     components_joint, num_components = skimage_connected_components(mask_binary, return_num=True)
-    component_ids = list(range(1, num_components))
+    component_ids = list(range(1, num_components+1))
     component_masks = components_joint == np.array(component_ids)[:, None, None]
+    print('number of co,ponets: , components', num_components, component_ids)
+    print('components joint shape=', components_joint.shape, np.max(components_joint))
     for ii, id in enumerate(component_ids):
         pos = np.where(component_masks[ii])
         xmin, xmax = (np.min(pos[1]), np.max(pos[1]))
         ymin, ymax = (np.min(pos[0]), np.max(pos[0]))
         area = (xmax - xmin) * (ymax - ymin)
+        print('area: ', area)
         # if area < 224 * 224:
         #     continue
         areas.append(area)
         boxes.append([xmin, ymin, xmax, ymax])
         labels.append(obj_label_id)
         masks.append(component_masks[ii])
+    print('boxes created: ', boxes)
     return boxes, labels, masks, areas

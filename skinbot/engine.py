@@ -814,7 +814,7 @@ def configure_engines_detection(target_mode,
         pbar = ProgressBar(persist=True)
     pbar.attach(trainer, metric_names="all")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=1))
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_training_results(engine):
         logging.info('Running training evaluation (detection): ')
         evaluator.state.coco_evaluator = trainer.state.get_coco_evaluator()
@@ -828,7 +828,7 @@ def configure_engines_detection(target_mode,
                      f"Training Results - Epoch: {engine.state.epoch} "
                      f"Avg Prec IoU@0.5 bbox: {IoU_precision_0p5_bbox:.2f}")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=1))
+    @trainer.on(Events.EPOCH_COMPLETED(every=10))
     def log_validation_results(engine):
         logging.info("Running validation evaluation (detection)...")
         evaluator.state.coco_evaluator =  evaluator.state.get_coco_evaluator() # CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
