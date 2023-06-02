@@ -10,7 +10,7 @@ from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from skinbot.config import Config
 from skinbot.segmentation import UNet
 from skinbot.autoencoders import VariationalAutoEncoder, AutoEncoder, ConvolutionalAutoEncoder, AutoEncoderClassifier
-from skinbot.utils_models import get_backbone
+from skinbot.utils_models import get_backbone, freeze_model, freeze_before_conv
 
 C = Config()
 
@@ -27,7 +27,13 @@ def classification_model(model_name, num_outputs, freeze='No', pretrained=True, 
         backbone_autoencoder = autoencoder_model(convae_model_name, num_outputs, freeze='No')
         # load the autoencoder model from ae_model_path
         backbone_autoencoder.load_state_dict(torch.load(ae_model_path))
-        # TODO: handle freeze
+        # freeze yes, no or before
+        if freeze == 'yes':
+            backbone_autoencoder = freeze_model(backbone_autoencoder)
+        elif freeze == 'no':
+            pass
+        else:
+            backbone_autoencoder = freeze_before_conv(backbone_autoencoder, freeze)
         model = AutoEncoderClassifier(backbone_autoencoder, num_outputs)
         return model
     else:

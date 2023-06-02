@@ -125,16 +125,21 @@ def print_trainable_parameters(model):
             logging.info(n)
 
 
-def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_only=False):
-    def freeze_model(model):
-        for p in model.parameters():
-            p.requires_grad = False
+def freeze_model(model):
+    for p in model.parameters():
+        p.requires_grad = False
+    return model
 
-    def freeze_before_conv(model, last_conv):
-        for n, p in model.named_parameters():
-            if n.startswith(last_conv):
-                break
-            p.requires_grad = False
+
+def freeze_before_conv(model, last_conv):
+    for n, p in model.named_parameters():
+        if n.startswith(last_conv):
+            break
+        p.requires_grad = False
+    return model
+
+
+def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_only=False):
 
     if model_name == 'resnet101':
         weights = models.ResNet101_Weights.DEFAULT  # if pretrained else None
@@ -143,7 +148,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
         if freeze == 'yes':
             freeze_model(backbone)
         elif freeze != 'no':
-            freeze_before_conv(backbone, last_conv=freeze)
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
             logging.info(f"Freezing all layers before {freeze}")
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
@@ -154,9 +159,9 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
         T = weights.transforms()
         backbone = models.resnet50(weights=weights)
         if freeze == 'yes':
-            freeze_model(backbone)
+            backbone = freeze_model(backbone)
         elif freeze != 'no':
-            freeze_before_conv(backbone, last_conv=freeze)
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
             logging.info(f"Freezing all layers before {freeze}")
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
@@ -167,9 +172,9 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
         T = weights.transforms()
         backbone = models.resnet18(weights=weights)
         if freeze == 'yes':
-            freeze_model(backbone)
+            backbone = freeze_model(backbone)
         elif freeze != 'no':
-            freeze_before_conv(backbone, last_conv=freeze)
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
             logging.info(f"Freezing all layers before {freeze}")
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
@@ -180,9 +185,9 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
         T = weights.transforms()
         backbone = models.vgg19(weights=weights)
         if freeze == 'yes':
-            freeze_model(backbone)
+            backbone = freeze_model(backbone)
         elif freeze != 'no':
-            freeze_before_conv(backbone, last_conv=freeze)
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
             logging.info(f"Freezing all layers before {freeze}")
             print_trainable_parameters(backbone)
         num_features = 512 * 7 * 7  # backbone.classifier.in_features
@@ -193,9 +198,9 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
         T = weights.transforms()
         backbone = models.vgg16(weights=weights)
         if freeze == 'yes':
-            freeze_model(backbone)
+            backbone = freeze_model(backbone)
         elif freeze != 'no':
-            freeze_before_conv(backbone, last_conv=freeze)
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
             logging.info(f"Freezing all layers before {freeze}")
             print_trainable_parameters(backbone)
         num_features = 512 * 7 * 7  # backbone.classifier.in_features
