@@ -26,6 +26,7 @@ class Encoder(nn.Module):
     def __init__(self, num_inputs, latent_dims, layers=None):
         super(Encoder, self).__init__()
         self.encoder_mlp = get_mlp(num_inputs, latent_dims, dropout=0, layers=layers)
+        self.latent_dims = latent_dims
 
     def forward(self, x):
         x = torch.flatten(x, start_dim=1)
@@ -94,6 +95,7 @@ class VariationalEncoderConditional(nn.Module):
             self.N.scale = self.N.scale.cuda()
         self.kl = torch.tensor(0)
         self.means_y = ConditionalGaussians(num_classes, latent_dims)
+        self.latent_dims = latent_dims
 
     def forward(self, x, y=None):
         x_flat = torch.flatten(x, start_dim=1)
@@ -126,6 +128,7 @@ class VariationalEncoder(nn.Module):
             self.N.loc = self.N.loc.cuda()  # hack to get sampling on the GPU
             self.N.scale = self.N.scale.cuda()
         self.kl = 0
+        self.latent_dims = latent_dims
 
     def forward(self, x):
         x_flat = torch.flatten(x, start_dim=1)
@@ -240,3 +243,23 @@ class ConvolutionalAutoEncoder(nn.Module):
 
         return h_hat
 
+class AutoEncoderClassifier(nn.Module):
+    def __init__(self, autoencoder, num_classes, layers=None):
+        super(AutoEncoderClassifier, self).__init__()
+        self.backbone = autoencoder.backbone
+        self.encoder = autoencoder.autoencoder.encoder
+        if isinstance(self.encoder, VariationalEncoderConditional):
+            self.is_variational = True
+        else:
+            self.is_variational = False
+        num_inputs = self.encoder.latent_dims
+        self.classifier = get_mlp(num_inputs, num_classes, dropout=0, layers=layers)
+
+    def forward(self, x, y=None):
+        h = self.backbone(x)
+        if self.is_variational:
+            # use the mean of the latent space
+            (z, _, _) = self.encoder(h, y)
+        else:
+            z = self.encoder(h, y)
+        return self.classifier(z)

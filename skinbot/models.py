@@ -9,18 +9,29 @@ from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 
 from skinbot.config import Config
 from skinbot.segmentation import UNet
-from skinbot.autoencoders import VariationalAutoEncoder, AutoEncoder, ConvolutionalAutoEncoder
+from skinbot.autoencoders import VariationalAutoEncoder, AutoEncoder, ConvolutionalAutoEncoder, AutoEncoderClassifier
 from skinbot.utils_models import get_backbone
 
 C = Config()
 
 
-def classification_model(model_name, num_outputs, freeze='No', pretrained=True):
+def classification_model(model_name, num_outputs, freeze='No', pretrained=True, ae_model_path=None):
     freeze = freeze.lower()
     backbone = None
     input_size = 224
-
-    return get_backbone(model_name, num_outputs, freeze='No', pretrained=True)
+    if model_name == 'AEC':
+        # load an autoencoder model
+        assert ae_model_path is not None, 'You need to provide a path to the autoencoder model'
+        # get model name thrid element of ae_model_path separated by _ e.g. 'best_fold=0_convae_reconstruction_all_model_negval=-0.0379.pt
+        convae_model_name = ae_model_path.split('_')[2]
+        backbone_autoencoder = autoencoder_model(convae_model_name, num_outputs, freeze='No')
+        # load the autoencoder model from ae_model_path
+        backbone_autoencoder.load_state_dict(torch.load(ae_model_path))
+        # TODO: handle freeze
+        model = AutoEncoderClassifier(backbone_autoencoder, num_outputs)
+        return model
+    else:
+        return get_backbone(model_name, num_outputs, freeze='No', pretrained=True)
 
 
 def detection_model(model_name, num_classes, pretrained=True):
