@@ -254,7 +254,10 @@ class DetectionPretrained:
     def __init__(self, test=False):
         self.test = test
         T = []
+        target_size = (1000,1000)
+        scale_range = (0.7,0.7)
         T.append(detection_transforms.ConvertImageDtype(torch.float))
+        T.append(detection_transforms.Scale(target_scale=scale_range))
         if not test:
             T.append(detection_transforms.RandomHorizontalFlip(0.5))
         self.T = detection_transforms.Compose(T)
