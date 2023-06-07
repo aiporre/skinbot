@@ -153,7 +153,7 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', **kwargs):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
-        model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze)
+        model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze, **kwargs)
     elif 'faster' in model_name or 'mask' in model_name:
         model = detection_model(model_name, C.labels.num_classes)
     elif model_name == 'unet':

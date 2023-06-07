@@ -39,7 +39,8 @@ def main(best_or_last='best',
          patience=None,
          model_path=None,
          external_data=False,
-         config_file='config.ini'):
+         config_file='config.ini',
+         ae_model_path=None):
     # log_interval = 1
     config = read_config(config_file)
     C = Config()
@@ -78,7 +79,8 @@ def main(best_or_last='best',
     train_dataloader = get_dataloaders(config, batch=batch_size, mode='train', fold_iteration=_fold, target=target_mode)
 
     # prepare models
-    model, optimizer = get_model(model_name, optimizer=optimizer, lr=LR, momentum=momentum, freeze=freeze)
+    model, optimizer = get_model(model_name, optimizer=optimizer, lr=LR, momentum=momentum, freeze=freeze,
+                                 ae_model_path=ae_model_path)
     # move model to gpu
     model.to(device)
     print(model)
@@ -306,6 +308,11 @@ if __name__ == "__main__":
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001,
     #      model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=model_path)
 
+    # training classification autoencoder classifier
+    ae_model_path = None
+    main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001,
+         model_name='aec', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=model_path,
+         ae_model_path=ae_model_path)
     # training detection
     #main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
     #     freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
@@ -315,5 +322,7 @@ if __name__ == "__main__":
     # training of autoencoders
     # main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=16, lr=1E-03, model_name='cvae',
     #      freeze='No', optimizer='ADAM', only_eval=False)
+
+
 
     print('this is created from the browser :)')
