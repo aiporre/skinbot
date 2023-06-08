@@ -207,9 +207,12 @@ def create_autoencoder_evaluator(model, device=None):
             torch.cuda.synchronize()
         # start evaluation
         with torch.no_grad():
+            print('model conditional', model.conditional)
             x_hat = model(x, y=y) if model.conditional else model(x)
             x_hat = torch.sigmoid(x_hat)
+            print(' hassatr(comde', hasattr(model, 'compute_kl') )
             kl = model.compute_kl() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
+            print('computed kl', kl)
         return x_hat, x_org, {'kl': kl}
 
     evaluator = Engine(update_model)

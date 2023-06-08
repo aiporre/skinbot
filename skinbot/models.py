@@ -81,7 +81,7 @@ def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=
     return model
 
 
-def autoencoder_model(model_name, num_classes, freeze='No'):
+def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
     num_inputs = eval(C.config['AUTOENCODER']['num_inputs'])
     num_outputs = eval(C.config['AUTOENCODER']['num_outputs'])
     latent_dims = int(C.config['AUTOENCODER']['latent_dims'])
@@ -119,20 +119,21 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
     if convolutional:
 
         if model_name == 'convae':
-            varational=False
+            variational=False
             _num_classes =None
         elif model_name == 'convvae':
-            varational = True
+            variational = True
             _num_classes =None
         elif model_name == 'convcvae':
-            varational = True
+            variational = True
             _num_classes = num_classes
         else:
             raise ValueError(f"model_name = {model_name} is not defined. Options: convAE, convVAE or convCVAE.")
+        print('-----> creating a convoluation autoenocde ', model_name)
         model = ConvolutionalAutoEncoder(
             num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=num_classes,
             layers=layers, backbone_name=backbone_name,
-            preserve_shape=False, varational=varational, reconstruct_image_features=reconstruct_image
+            preserve_shape=False, variational=variational, reconstruct_image_features=reconstruct_image
         )
     else:
         if model_name == 'ae':

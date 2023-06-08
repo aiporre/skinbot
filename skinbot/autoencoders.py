@@ -65,8 +65,6 @@ class AutoEncoder(nn.Module):
 
     def latent(self, x, y=None):
         z = self.encoder(x)
-        if y is not None:
-            z = torch.concat([z, y], dim=1)
         return z
 
 class ConditionalGaussians(nn.Module):
@@ -101,6 +99,7 @@ class VariationalEncoderConditional(nn.Module):
             self.N.scale = self.N.scale.cuda()
         self.kl = torch.tensor(0)
         self.means_y = ConditionalGaussians(num_classes, latent_dims)
+        print('ia12834u349279482379  0---- >>> intial gausians: ', self.means_y)
         self.latent_dims = latent_dims
 
     def forward(self, x, y=None):
@@ -114,7 +113,9 @@ class VariationalEncoderConditional(nn.Module):
             z_prior = self.means_y(z)
             self.kl = 0.5*(z_prior**2 + sigma.unsqueeze(dim=1)**2 - log_var.unsqueeze(dim=1)-1)
             self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).mean() #.sum(dim=1).mean(dim=0) # .mean(dim=1)
+            print('inside the vae cond ;kl = ', self.kl)
         else:
+            print('y seems tobe none kl = 0')
             self.kl = torch.tensor(0)
         # self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
@@ -152,11 +153,13 @@ class VariationalAutoEncoder(nn.Module):
         assert len(layers) > 0, 'Variational autoencoder need layers to have at least one dimension'
 
         if num_classes is None:
+            print('=====>> making encode normal')
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
             layers.reverse()
             self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = False
         else:
+            print('=====>> making encode conditional')
             self.encoder = VariationalEncoderConditional(num_inputs, num_classes, latent_dims, layers=layers)
             layers.reverse()
             self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
@@ -171,6 +174,7 @@ class VariationalAutoEncoder(nn.Module):
         # if y is not None:
         #    z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
+
     def latent(self, x, y=None):
         return self.encoder(x, y)[1]
 
@@ -183,22 +187,13 @@ class ConvolutionalAutoEncoder(nn.Module):
                  num_classes=None,
                  layers=None,
                  preserve_shape=False,
-                 varational=False,
+                 variational=False,
                  reconstruct_image_features=False,
                  backbone_name='resnet50'):
         super(ConvolutionalAutoEncoder, self).__init__()
         self.backbone = get_backbone(backbone_name, None, freeze='Yes', conv_only=True)
         num_features_backbone = self.backbone.num_features
-        if varational:
-            self.autoencoder = AutoEncoder(num_inputs=num_features_backbone,
-                                           num_outputs=num_features_backbone,
-                                           latent_dims=latent_dims,
-                                           num_classes=num_classes,
-                                           layers=layers,
-                                           preserve_shape=preserve_shape)
-            self.is_variational = False
-            self.is_conditional = self.autoencoder.conditional
-        else:
+        if variational:
             self.autoencoder = VariationalAutoEncoder(
                                        num_inputs=num_features_backbone,
                                        num_outputs=num_features_backbone,
@@ -206,9 +201,16 @@ class ConvolutionalAutoEncoder(nn.Module):
                                        num_classes=num_classes,
                                        layers=layers,
                                        preserve_shape=preserve_shape)
-            self.is_variational = True
-            self.is_conditional = self.autoencoder.conditional
+            self.compute_kl = self.autoencoder.compute_kl
+        else:
+            self.autoencoder = AutoEncoder(num_inputs=num_features_backbone,
+                                           num_outputs=num_features_backbone,
+                                           latent_dims=latent_dims,
+                                           num_classes=num_classes,
+                                           layers=layers,
+                                           preserve_shape=preserve_shape)
         self.conditional = self.autoencoder.conditional
+        self.is_variational = variational 
 
         self.reconstruct_image_features = reconstruct_image_features
 
@@ -258,6 +260,7 @@ class ConvolutionalAutoEncoder(nn.Module):
     def latent(self, x, y=None):
         h = self.backbone(x)
         return self.autoencoder.latent(h, y)
+
 
 class AutoEncoderClassifier(nn.Module):
     def __init__(self, autoencoder, num_classes, layers=None):
