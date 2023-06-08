@@ -1,4 +1,5 @@
 from functools import reduce
+import os
 import skinbot.skinlogging as logging
 
 import torch
@@ -19,11 +20,12 @@ def classification_model(model_name, num_outputs, freeze='No', pretrained=True, 
     freeze = freeze.lower()
     backbone = None
     input_size = 224
-    if model_name == 'AEC':
+    if model_name == 'aec':
         # load an autoencoder model
         assert ae_model_path is not None, 'You need to provide a path to the autoencoder model'
         # get model name thrid element of ae_model_path separated by _ e.g. 'best_fold=0_convae_reconstruction_all_model_negval=-0.0379.pt
-        convae_model_name = ae_model_path.split('_')[2]
+        convae_model_name = os.path.basename(ae_model_path).split('_')[2]
+        logging.info(f"the autoencoder backbonoe detected is: {convae_model_name}:")
         backbone_autoencoder = autoencoder_model(convae_model_name, num_outputs, freeze='No')
         # load the autoencoder model from ae_model_path
         backbone_autoencoder.load_state_dict(torch.load(ae_model_path))
@@ -152,7 +154,7 @@ def autoencoder_model(model_name, num_classes, freeze='No'):
 
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', **kwargs):
     model_name = model_name.lower()
-    if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn':
+    if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn' or model_name == 'aec':
         model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze, **kwargs)
     elif 'faster' in model_name or 'mask' in model_name:
         model = detection_model(model_name, C.labels.num_classes)
