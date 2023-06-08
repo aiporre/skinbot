@@ -159,9 +159,9 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
                 _ , embedding, _ = autoencoder.latent(features)
             elif isinstance(autoencoder, ConvolutionalAutoEncoder):
                 if autoencoder.is_variational:
-                    _, embedding, _ = autoencoder.autoencoder.latent(features)
+                    _, embedding, _ = autoencoder.latent(features)
                 else:
-                    embedding = autoencoder.autoencoder.latent(features)
+                    embedding = autoencoder.latent(features)
             elif isinstance(autoencoder, AutoEncoderClassifier):
                 if autoencoder.is_variational:
                     _, embedding, _ = autoencoder.latent(features)
