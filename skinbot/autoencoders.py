@@ -259,7 +259,7 @@ class AutoEncoderClassifier(nn.Module):
         h = self.backbone(x)
         if self.is_variational:
             # use the mean of the latent space
-            (z, _, _) = self.encoder(h, y)
+            (z, _, _) = self.encoder(h)
         else:
-            z = self.encoder(h, y)
+            z = self.encoder(h)
         return self.classifier(z)

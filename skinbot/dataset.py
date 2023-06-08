@@ -282,6 +282,7 @@ class WoundImages(Dataset):
             boxes, labels, areas, iscrowd = detection_json['boxes'], detection_json['labels'], \
                 detection_json['areas'], detection_json['iscrowd']
         else:
+            logging.info(f'DEBUG: Detection file not found json or npy for {index}: {self.image_fnames[index]}. Creating...')
             mask = self._read_one_detection_mask(self.image_fnames[index])
             lesion_ids = get_ids_by_categorie(self.root_dir, 'lesion')
 
@@ -315,6 +316,7 @@ class WoundImages(Dataset):
             logging.debug(f"Resulting detection json: {detection_json}.")
             with open(detection_json_path, 'w') as f:
                 json.dump(detection_json, f, cls=NpEncoder)
+            logging.info(f'DEBUG: Done creating files: {detection_json} and {detection_npy_path}')
         # convert to np.array to speed up conversion to tensor
         boxes, labels, masks, areas, iscrowd = np.array(boxes), np.array(labels), np.array(masks), np.array(areas), \
             np.array(iscrowd)
