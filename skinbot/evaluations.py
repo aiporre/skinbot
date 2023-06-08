@@ -154,19 +154,19 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
             targets = targets.to(device)
             targets_num = torch.argmax(targets, dim=1)
             if isinstance(autoencoder, AutoEncoder):
-                embedding = autoencoder.encoder(features)
+                embedding = autoencoder.latent(features)
             elif isinstance(autoencoder, VariationalAutoEncoder):
-                _ , embedding, _ = autoencoder.encoder(features)
+                _ , embedding, _ = autoencoder.latent(features)
             elif isinstance(autoencoder, ConvolutionalAutoEncoder):
                 if autoencoder.is_variational:
-                    _, embedding, _ = autoencoder.autoencoder.encoder(features)
+                    _, embedding, _ = autoencoder.autoencoder.latent(features)
                 else:
-                    embedding = autoencoder.autoencoder.encoder(features)
+                    embedding = autoencoder.autoencoder.latent(features)
             elif isinstance(autoencoder, AutoEncoderClassifier):
                 if autoencoder.is_variational:
-                    _, embedding, _ = autoencoder.encoder(features)
+                    _, embedding, _ = autoencoder.latent(features)
                 else:
-                    embedding = autoencoder.encoder(features)
+                    embedding = autoencoder.latent(features)
             else:
                 raise ValueError(f'autoencoder {type(autoencoder)} type not supported')
 

@@ -63,6 +63,12 @@ class AutoEncoder(nn.Module):
             z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
+    def latent(self, x, y=None):
+        z = self.encoder(x)
+        if y is not None:
+            z = torch.concat([z, y], dim=1)
+        return z
+
 class ConditionalGaussians(nn.Module):
     def __init__(self, num_classes, latent_dims):
         super(ConditionalGaussians, self).__init__()
@@ -165,6 +171,8 @@ class VariationalAutoEncoder(nn.Module):
         # if y is not None:
         #    z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
+    def latent(self, x, y=None):
+        return self.encoder(x, y)[1]
 
 class ConvolutionalAutoEncoder(nn.Module):
 
@@ -189,6 +197,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                                            layers=layers,
                                            preserve_shape=preserve_shape)
             self.is_variational = False
+            self.is_conditional = self.autoencoder.conditional
         else:
             self.autoencoder = VariationalAutoEncoder(
                                        num_inputs=num_features_backbone,
@@ -198,6 +207,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                                        layers=layers,
                                        preserve_shape=preserve_shape)
             self.is_variational = True
+            self.is_conditional = self.autoencoder.conditional
         self.conditional = self.autoencoder.conditional
 
         self.reconstruct_image_features = reconstruct_image_features
@@ -245,15 +255,17 @@ class ConvolutionalAutoEncoder(nn.Module):
 
         return h_hat
 
+    def latent(self, x, y=None):
+        h = self.backbone(x)
+        return self.autoencoder.latent(h, y)
+
 class AutoEncoderClassifier(nn.Module):
     def __init__(self, autoencoder, num_classes, layers=None):
         super(AutoEncoderClassifier, self).__init__()
         self.backbone = autoencoder.backbone
         self.encoder = autoencoder.autoencoder.encoder
-        if isinstance(self.encoder, VariationalEncoderConditional):
-            self.is_variational = True
-        else:
-            self.is_variational = False
+        self.is_variational = autoencoder.is_variational
+        self.is_conditional = autoencoder.is_conditional
         num_inputs = self.encoder.latent_dims
         self.classifier = get_mlp(num_inputs, num_classes, dropout=0, layers=layers)
 
@@ -265,3 +277,11 @@ class AutoEncoderClassifier(nn.Module):
         else:
             z = self.encoder(h)
         return self.classifier(z)
+    def latent(self, x, y=None):
+        h = self.backbone(x)
+        if self.is_variational:
+            # use the mean of the latent space
+            (_, z, _) = self.encoder(h, y)
+        else:
+            z = self.encoder(h, y)
+        return z
