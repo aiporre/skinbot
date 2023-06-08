@@ -188,6 +188,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                                            num_classes=num_classes,
                                            layers=layers,
                                            preserve_shape=preserve_shape)
+            self.is_variational = False
         else:
             self.autoencoder = VariationalAutoEncoder(
                                        num_inputs=num_features_backbone,
@@ -196,6 +197,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                                        num_classes=num_classes,
                                        layers=layers,
                                        preserve_shape=preserve_shape)
+            self.is_variational = True
         self.conditional = self.autoencoder.conditional
 
         self.reconstruct_image_features = reconstruct_image_features

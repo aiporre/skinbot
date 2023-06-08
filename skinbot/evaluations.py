@@ -8,7 +8,7 @@ from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, Ablat
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
-from skinbot.autoencoders import AutoEncoder
+from skinbot.autoencoders import AutoEncoder, VariationalAutoEncoder, ConvolutionalAutoEncoder, AutoEncoderClassifier
 from skinbot.config import Config
 from skinbot.dataset import crop_lesion, read_image
 import numpy as np
@@ -155,8 +155,20 @@ def plot_latent_space(autoencoder, num_classes, data_loader, device, save=False,
             targets_num = torch.argmax(targets, dim=1)
             if isinstance(autoencoder, AutoEncoder):
                 embedding = autoencoder.encoder(features)
-            else:
+            elif isinstance(autoencoder, VariationalAutoEncoder):
                 _ , embedding, _ = autoencoder.encoder(features)
+            elif isinstance(autoencoder, ConvolutionalAutoEncoder):
+                if autoencoder.is_variational:
+                    _, embedding, _ = autoencoder.autoencoder.encoder(features)
+                else:
+                    embedding = autoencoder.autoencoder.encoder(features)
+            elif isinstance(autoencoder, AutoEncoderClassifier):
+                if autoencoder.is_variational:
+                    _, embedding, _ = autoencoder.encoder(features)
+                else:
+                    embedding = autoencoder.encoder(features)
+            else:
+                raise ValueError(f'autoencoder {type(autoencoder)} type not supported')
 
             for i in range(num_classes):
                 if i in targets_num:
