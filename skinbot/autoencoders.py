@@ -1,8 +1,11 @@
 import math
 
+
+
 import numpy as np
 import torch
 import torch.nn as nn
+from scipy.spatial import cKDTree
 
 import skinbot.skinlogging as logging
 from skinbot.utils_models import get_backbone, PlainLayer, get_conv_size, Interpolation, DeconvBlock, \
@@ -67,12 +70,36 @@ class AutoEncoder(nn.Module):
         z = self.encoder(x)
         return z
 
+
+def generate_points(num_classes, latent_dims, gain=10):
+    points = []
+    d = latent_dims  # Number of dimensions
+    n_points = num_classes  # Number of points to generate
+    min_distance = gain  # Minimum distance between points
+
+    while len(points) < n_points:
+        new_point = torch.rand(d)  # Generate a random point in d-dimensional space
+        if len(points) == 0:
+            points.append(new_point)
+        else:
+            # Build a KDTree from the existing points
+            kdtree = cKDTree(points)
+
+            # Query the KDTree to find the closest point to the new point
+            dist, _ = kdtree.query(new_point)
+
+            # If the closest point is farther than the minimum distance, add the new point
+            if dist > min_distance:
+                points.append(new_point)
+
+    return torch.stack(points)
 class ConditionalGaussians(nn.Module):
     def __init__(self, num_classes, latent_dims):
         super(ConditionalGaussians, self).__init__()
-        _means = torch.empty(num_classes, latent_dims)
-        _means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
+        #_means = torch.empty(num_classes, latent_dims)
+        #_means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
         # _means = nn.init.zeros_(_means)
+        _means = generate_points(num_classes, latent_dims, gain=10)
         self.means = nn.Parameter(_means, requires_grad=True)
 
     def forward(self, z):
@@ -99,7 +126,6 @@ class VariationalEncoderConditional(nn.Module):
             self.N.scale = self.N.scale.cuda()
         self.kl = torch.tensor(0)
         self.means_y = ConditionalGaussians(num_classes, latent_dims)
-        print('ia12834u349279482379  0---- >>> intial gausians: ', self.means_y)
         self.latent_dims = latent_dims
 
     def forward(self, x, y=None):
@@ -113,9 +139,7 @@ class VariationalEncoderConditional(nn.Module):
             z_prior = self.means_y(z)
             self.kl = 0.5*(z_prior**2 + sigma.unsqueeze(dim=1)**2 - log_var.unsqueeze(dim=1)-1)
             self.kl = torch.bmm(y.unsqueeze(dim=1).float(), self.kl).mean() #.sum(dim=1).mean(dim=0) # .mean(dim=1)
-            print('inside the vae cond ;kl = ', self.kl)
         else:
-            print('y seems tobe none kl = 0')
             self.kl = torch.tensor(0)
         # self.kl = 0.5 * (sigma**2 + mu ** 2 - log_var - 1).sum(dim=1).mean(dim=0)
         return z, mu, log_var
@@ -153,13 +177,11 @@ class VariationalAutoEncoder(nn.Module):
         assert len(layers) > 0, 'Variational autoencoder need layers to have at least one dimension'
 
         if num_classes is None:
-            print('=====>> making encode normal')
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
             layers.reverse()
             self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
             self.conditional = False
         else:
-            print('=====>> making encode conditional')
             self.encoder = VariationalEncoderConditional(num_inputs, num_classes, latent_dims, layers=layers)
             layers.reverse()
             self.decoder = Decoder(latent_dims, num_outputs, layers=layers)
@@ -210,7 +232,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                                            layers=layers,
                                            preserve_shape=preserve_shape)
         self.conditional = self.autoencoder.conditional
-        self.is_variational = variational 
+        self.is_variational = variational
 
         self.reconstruct_image_features = reconstruct_image_features
 
