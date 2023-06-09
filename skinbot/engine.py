@@ -202,7 +202,7 @@ def create_autoencoder_evaluator(model, device=None):
         model.eval()
         x, y = ae_prepare_batch(batch, device=device)
 
-        x_org = copy.deepcopy(x)
+        x_org = copy.deepcopy(model.original_image()) if hasattr(model, 'original_image') else copy.deepcopy(x)
         if torch.has_cuda:
             torch.cuda.synchronize()
         # start evaluation

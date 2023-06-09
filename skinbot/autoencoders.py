@@ -284,10 +284,15 @@ class ConvolutionalAutoEncoder(nn.Module):
             h_hat = self.deconv(h_hat)
             h_hat = self.interpolation(h_hat)
             h_hat = self.output_layer(h_hat)
+            self._x_org = x
         else:
             self._r_loss = ((h - h_hat) ** 2).mean()
+            self._x_org = h
 
         return h_hat
+
+    def original_image(self):
+        return self._x_org
 
     def latent(self, x, y=None):
         h = self.backbone(x)
