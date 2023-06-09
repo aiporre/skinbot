@@ -136,6 +136,17 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
             layers=layers, backbone_name=backbone_name,
             preserve_shape=False, variational=variational, reconstruct_image=reconstruct_image
         )
+
+        if freeze == 'backbone':
+            model.backbone = freeze_model(model.backbone)
+        elif freeze == 'encoder':
+            model = freeze_before_conv(model, 'autoencoder.encoder')
+        elif freeze == 'decoder':
+            model = freeze_before_conv(model, 'autoencoder.decoder')
+        elif freeze == 'No':
+            pass
+        else:
+            model.backbone = freeze_before_conv(model.backbone, freeze)
     else:
         if model_name == 'ae':
             model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers,
@@ -151,6 +162,15 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
             # model = VariationalAutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, num_classes=num_classes,
             #                                latent_dims=latent_dims, layers=layers, preserve_shape=preserve_shape)
             raise ValueError(f"model_name = {model_name} is not defined. Options: ae, vae cae.")
+        if freeze.lower() == 'encoder':
+            model.encoder = freeze_model(model.encoder)
+        elif freeze.lower() == 'decoder':
+            model.encoder = freeze_model(model.encoder)
+        elif freeze.lower() == 'no':
+            pass
+        else:
+            raise ValueError(f'Wrong freeze value {freeze}. Options: encoder, decoder, no')
+
     return model
 
 
