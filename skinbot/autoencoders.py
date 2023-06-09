@@ -70,6 +70,8 @@ class AutoEncoder(nn.Module):
         z = self.encoder(x)
         return z
 
+    def reconstruction_loss(self, x, x_hat):
+        return ((x - x_hat) ** 2).mean()
 
 def generate_points(num_classes, latent_dims, gain=10):
     points = []
@@ -200,6 +202,9 @@ class VariationalAutoEncoder(nn.Module):
     def latent(self, x, y=None):
         return self.encoder(x, y)[1]
 
+    def reconstruction_loss(self, x, x_hat):
+        return ((x - x_hat) ** 2).mean()
+
 class ConvolutionalAutoEncoder(nn.Module):
 
     # def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
@@ -271,17 +276,27 @@ class ConvolutionalAutoEncoder(nn.Module):
     def forward(self, x, y=None):
         h = self.backbone(x)
         h_hat = self.autoencoder(h, y)
+        # reconstruction loss is computed in the h space if we are reconstructing the image features
+        # otherwise we need to reconstruct the image from the h space
         if not self.reconstruct_image_features:
             h_hat = self.recover_H1W1C1(h_hat)
             h_hat = self.deconv(h_hat)
             h_hat = self.interpolation(h_hat)
             h_hat = self.output_layer(h_hat)
+        else:
+            self._r_loss = ((h - h_hat) ** 2).mean()
 
         return h_hat
 
     def latent(self, x, y=None):
         h = self.backbone(x)
         return self.autoencoder.latent(h, y)
+
+    def reconstruction_loss(self, x, x_hat):
+        if self.reconstruct_image_features:
+            return self._r_loss
+        else:
+            return ((x - x_hat) ** 2).mean()
 
 
 class AutoEncoderClassifier(nn.Module):

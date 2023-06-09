@@ -149,11 +149,11 @@ def create_autoencoder_trainer(model, optimizer, device=None):
         if hasattr(model, 'compute_kl'):
             gamma = 50. # 100.0 #1.0
             beta = 0.001 #. # .
-            reconstruction_loss = gamma*((x - x_hat) ** 2).mean() #.flatten(start_dim=1).mean(dim=1).mean(dim=0)
+            reconstruction_loss = gamma*model.reconstruction_loss(x, x_hat) #.flatten(start_dim=1).mean(dim=1).mean(dim=0)
             kl_div = beta*model.compute_kl()
             loss = reconstruction_loss + kl_div
         else:
-            loss = ((x - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0)
+            loss = model.reconstruction_loss(x, x_hat) #((x - x_hat) ** 2).view(1,-1).mean(dim=1).mean(dim=0)
 
         engine.state.optimizer.zero_grad()
         loss.backward()
