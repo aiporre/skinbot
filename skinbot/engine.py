@@ -202,7 +202,7 @@ def create_autoencoder_evaluator(model, device=None):
         model.eval()
         x, y = ae_prepare_batch(batch, device=device)
 
-        x_org = copy.deepcopy(model.original_image()) if hasattr(model, 'original_image') else copy.deepcopy(x)
+        x_org = copy.deepcopy(x)
         if torch.has_cuda:
             torch.cuda.synchronize()
         # start evaluation
@@ -210,6 +210,8 @@ def create_autoencoder_evaluator(model, device=None):
             x_hat = model(x, y=y) if model.conditional else model(x)
             x_hat = torch.sigmoid(x_hat)
             kl = model.compute_kl() if hasattr(model, 'compute_kl') else torch.zeros([], device=device)
+            if hasattr(model, 'original_image'):
+                x_org = model.original_image()
         return x_hat, x_org, {'kl': kl}
 
     evaluator = Engine(update_model)
@@ -644,7 +646,7 @@ def configure_engines_autoencoder(target_mode,
                      f"LOSS: {loss:.5f} "
                      f"KL: {kl:.5f} ")
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=10))
+    @trainer.on(Events.EPOCH_COMPLETED(every=1))
     def log_validation_results(engine):
         logging.info("Evaluation of testing set ...")
         evaluator.run(test_dataloader)
