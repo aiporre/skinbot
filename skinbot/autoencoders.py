@@ -215,7 +215,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                  layers=None,
                  preserve_shape=False,
                  variational=False,
-                 reconstruct_image_features=False,
+                 reconstruct_image=False,
                  backbone_name='resnet50'):
         super(ConvolutionalAutoEncoder, self).__init__()
         self.backbone = get_backbone(backbone_name, None, freeze='Yes', conv_only=True)
@@ -239,9 +239,9 @@ class ConvolutionalAutoEncoder(nn.Module):
         self.conditional = self.autoencoder.conditional
         self.is_variational = variational
 
-        self.reconstruct_image_features = reconstruct_image_features
+        self.reconstruct_image = reconstruct_image
 
-        if not reconstruct_image_features:
+        if reconstruct_image:
             # needs a reconstruction of original input image.
             # self.global_avg_pool = nn.AdaptiveAvgPool2ddaptive_max_pool2d(output_size=1)
 
@@ -278,7 +278,7 @@ class ConvolutionalAutoEncoder(nn.Module):
         h_hat = self.autoencoder(h, y)
         # reconstruction loss is computed in the h space if we are reconstructing the image features
         # otherwise we need to reconstruct the image from the h space
-        if not self.reconstruct_image_features:
+        if self.reconstruct_image:
             h_hat = self.recover_H1W1C1(h_hat)
             h_hat = self.deconv(h_hat)
             h_hat = self.interpolation(h_hat)
@@ -293,10 +293,10 @@ class ConvolutionalAutoEncoder(nn.Module):
         return self.autoencoder.latent(h, y)
 
     def reconstruction_loss(self, x, x_hat):
-        if self.reconstruct_image_features:
-            return self._r_loss
-        else:
+        if self.reconstruct_image:
             return ((x - x_hat) ** 2).mean()
+        else:
+            return self._r_loss
 
 
 class AutoEncoderClassifier(nn.Module):
