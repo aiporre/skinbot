@@ -75,10 +75,10 @@ def generate_points(num_classes, latent_dims, gain=10):
     points = []
     d = latent_dims  # Number of dimensions
     n_points = num_classes  # Number of points to generate
-    min_distance = gain  # Minimum distance between points
+    min_distance = 0.1  # Minimum distance between points
 
     while len(points) < n_points:
-        new_point = torch.rand(d)  # Generate a random point in d-dimensional space
+        new_point = 2*torch.rand(d).numpy()-1  # Generate a random point in d-dimensional space
         if len(points) == 0:
             points.append(new_point)
         else:
@@ -91,7 +91,7 @@ def generate_points(num_classes, latent_dims, gain=10):
             # If the closest point is farther than the minimum distance, add the new point
             if dist > min_distance:
                 points.append(new_point)
-
+    points = [torch.tensor(10*gain*p) for p in points]
     return torch.stack(points)
 class ConditionalGaussians(nn.Module):
     def __init__(self, num_classes, latent_dims):
@@ -100,6 +100,7 @@ class ConditionalGaussians(nn.Module):
         #_means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
         # _means = nn.init.zeros_(_means)
         _means = generate_points(num_classes, latent_dims, gain=10)
+        print('------------------------>>>  conditional points generated', _means)
         self.means = nn.Parameter(_means, requires_grad=True)
 
     def forward(self, z):
@@ -290,7 +291,7 @@ class AutoEncoderClassifier(nn.Module):
         self.backbone = autoencoder.backbone
         self.encoder = autoencoder.autoencoder.encoder
         self.is_variational = autoencoder.is_variational
-        self.is_conditional = autoencoder.is_conditional
+        self.is_conditional = autoencoder.conditional
         num_inputs = self.encoder.latent_dims
         self.classifier = get_mlp(num_inputs, num_classes, dropout=0, layers=layers)
 
