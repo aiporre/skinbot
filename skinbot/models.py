@@ -130,23 +130,28 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
             _num_classes = num_classes
         else:
             raise ValueError(f"model_name = {model_name} is not defined. Options: convAE, convVAE or convCVAE.")
-        print('-----> creating a convoluation autoenocde ', model_name)
         model = ConvolutionalAutoEncoder(
             num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=num_classes,
             layers=layers, backbone_name=backbone_name,
             preserve_shape=False, variational=variational, reconstruct_image=reconstruct_image
         )
 
-        if freeze == 'backbone':
+        if freeze.lower() == 'backbone':
             model.backbone = freeze_model(model.backbone)
-        elif freeze == 'encoder':
+        elif freeze.lower() == 'encoder':
             model = freeze_before_conv(model, 'autoencoder.encoder')
-        elif freeze == 'decoder':
+            freeze = 'autoencoder.encoder'
+        elif freeze.lower() == 'decoder':
             model = freeze_before_conv(model, 'autoencoder.decoder')
-        elif freeze == 'No':
+            freeze = 'autoencoder.decoder'
+        elif freeze.lower() == 'no':
             pass
+        elif freeze.lower() == 'yes':
+            model = freeze_model(model)
+            freeze = 'all'
         else:
             model.backbone = freeze_before_conv(model.backbone, freeze)
+        logging.info(f'Freezing model at point: {freeze}')
     else:
         if model_name == 'ae':
             model = AutoEncoder(num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, layers=layers,
@@ -194,6 +199,9 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', *
                     model_parameters.append(p)
         else:
             model_parameters = model.parameters()
+        if len(parameters) == 0:
+            logging.warning("No parameters detected in the model")
+            return model, None
 
         if optimizer == 'SGD':
             model_optimizer = torch.optim.SGD(model_parameters, lr=lr, momentum=momentum)
