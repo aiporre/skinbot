@@ -94,6 +94,7 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
             f'Wrong config.ini. Num_inputs must be the same a num_outputs.' \
             f' And max only three. Given  inputs {num_inputs},' \
             f'and outputs {num_outputs}'
+        reconstruct_image = True
         convolutional = True
     elif isinstance(num_inputs, int) and isinstance(num_outputs, int):
         assert num_inputs == num_outputs, \
@@ -101,7 +102,7 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
             f'And max only three. Given inputs {num_inputs}' \
             f'and outputs {num_outputs}'
         convolutional = False
-        reconstruct_image = True
+        reconstruct_image = False
     elif isinstance(num_inputs, (list, tuple)) and isinstance(num_outputs, int):
         assert model_name.startswith(
             'conv'), " if num input has more than one dimension you should use a conv version of the autoencoder"
@@ -133,7 +134,7 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
         model = ConvolutionalAutoEncoder(
             num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=num_classes,
             layers=layers, backbone_name=backbone_name,
-            preserve_shape=False, variational=variational, reconstruct_image_features=reconstruct_image
+            preserve_shape=False, variational=variational, reconstruct_image=reconstruct_image
         )
     else:
         if model_name == 'ae':
