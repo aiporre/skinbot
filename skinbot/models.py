@@ -118,7 +118,6 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
         # infers if convolutional activativate
 
     if convolutional:
-
         if model_name == 'convae':
             variational=False
             _num_classes =None
@@ -131,7 +130,7 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
         else:
             raise ValueError(f"model_name = {model_name} is not defined. Options: convAE, convVAE or convCVAE.")
         model = ConvolutionalAutoEncoder(
-            num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=num_classes,
+            num_inputs=num_inputs, num_outputs=num_outputs, latent_dims=latent_dims, num_classes=_num_classes,
             layers=layers, backbone_name=backbone_name,
             preserve_shape=False, variational=variational, reconstruct_image=reconstruct_image
         )
@@ -199,7 +198,7 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', *
                     model_parameters.append(p)
         else:
             model_parameters = model.parameters()
-        if len(parameters) == 0:
+        if len(model_parameters) == 0:
             logging.warning("No parameters detected in the model")
             return model, None
 

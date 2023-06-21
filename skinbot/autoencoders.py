@@ -102,7 +102,6 @@ class ConditionalGaussians(nn.Module):
         #_means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
         # _means = nn.init.zeros_(_means)
         _means = generate_points(num_classes, latent_dims, gain=10)
-        print('------------------------>>>  conditional points generated', _means)
         self.means = nn.Parameter(_means, requires_grad=True)
 
     def forward(self, z):
@@ -178,7 +177,6 @@ class VariationalAutoEncoder(nn.Module):
     def __init__(self, num_inputs, num_outputs, latent_dims, num_classes=None, layers=None, preserve_shape=False):
         super(VariationalAutoEncoder, self).__init__()
         assert len(layers) > 0, 'Variational autoencoder need layers to have at least one dimension'
-
         if num_classes is None:
             self.encoder = VariationalEncoder(num_inputs, latent_dims, layers=layers)
             layers.reverse()
@@ -195,13 +193,16 @@ class VariationalAutoEncoder(nn.Module):
         return self.encoder.kl
     def forward(self, x, y=None):
         shape = x.shape if self.preserve_shape else None
-        (z, _, _) = self.encoder(x, y)
+        (z, _, _) = self.encoder(x, y) if self.conditional else self.encoder(x)
         # if y is not None:
         #    z = torch.concat([z, y], dim=1)
         return self.decoder(z, shape=shape)
 
     def latent(self, x, y=None):
-        return self.encoder(x, y)[1]
+        if self.conditional:
+            return self.encoder(x, y=y)[1]
+        else:
+            return self.encoder(x)[1]
 
     def reconstruction_loss(self, x, x_hat):
         return ((x - x_hat) ** 2).mean()
@@ -276,7 +277,7 @@ class ConvolutionalAutoEncoder(nn.Module):
 
     def forward(self, x, y=None):
         h = self.backbone(x)
-        h_hat = self.autoencoder(h, y)
+        h_hat = self.autoencoder(h, y) if self.conditional else self.autoencoder(h)
         # reconstruction loss is computed in the h space if we are reconstructing the image features
         # otherwise we need to reconstruct the image from the h space
         if self.reconstruct_image:
