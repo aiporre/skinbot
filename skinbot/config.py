@@ -80,6 +80,31 @@ class LabelConstantsInfection:
 
     num_classes = len(target_str_to_num)
 
+class LabelConstantsBland:
+    target_str_to_num = {
+        'normal': 0,
+        'bland': 1
+    }
+
+    target_weights = {
+        'normal': 0.77,
+        'bland': 0.20,
+    }
+
+    fixed_error_labels = {
+        'vaskulitis': 'normal',
+        'dermatitis': 'normal',
+        'contact': 'normal',
+        'vasculitis': 'normal',
+        'necrosis': 'normal',
+        'malignant': 'normal',
+        'pyoderma': 'normal',
+        'infection': 'normal'
+    }
+
+    num_classes = len(target_str_to_num)
+
+
 class LabelConstantsSpecial:
     target_str_to_num = {
         'special': 0,
@@ -272,6 +297,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsAll
         elif config['DATASET']['labels'].lower() == 'infection':
             self.labels = LabelConstantsInfection
+        elif config['DATASET']['labels'].lower() == 'bland':
+            self.labels = LabelConstantsBland
         elif config['DATASET']['labels'].lower() == 'malignant':
             self.labels = LabelConstantsMalignant 
         elif config['DATASET']['labels'].lower() == 'special':
