@@ -182,6 +182,35 @@ class WoundImages(Dataset):
         self.crop_lesion = crop_lesion
         self._crop_boxes = {}
 
+        # check if flag balance is true
+        if C.config['DATASET']['balance']:
+            self.balance_dataset()
+
+    def balance_dataset(self):
+        def get_labels(fname):
+            label = fname.split("_")[0]
+            return label
+
+        # get the number of samples per class
+        samples_per_class = {}
+        for fname in self.image_fnames:
+            labels = get_labels(fname)
+            for k, v in labels.items():
+                if k not in samples_per_class:
+                    samples_per_class[k] = 0
+                samples_per_class[k] += 1
+        # get the minimum number of samples per class
+        min_samples = min(samples_per_class.values())
+        # remove samples from the classes that have more samples than the minimum
+        for fname in self.image_fnames:
+            labels = get_labels(fname)
+            for k, v in labels.items():
+                if samples_per_class[k] > min_samples:
+                    self.image_fnames.remove(fname)
+                    samples_per_class[k] -= 1
+                    break
+
+
     def __fix_missing_files(self):
         # Maintains list of files valid
         for f in self.image_fnames:
