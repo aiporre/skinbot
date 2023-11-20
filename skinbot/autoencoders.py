@@ -101,7 +101,7 @@ class ConditionalGaussians(nn.Module):
         #_means = torch.empty(num_classes, latent_dims)
         #_means = nn.init.xavier_uniform_(_means, gain=10*num_classes)
         # _means = nn.init.zeros_(_means)
-        _means = generate_points(num_classes, latent_dims, gain=10)
+        _means = generate_points(num_classes, latent_dims, gain=5)
         self.means = nn.Parameter(_means, requires_grad=True)
 
     def forward(self, z):
@@ -220,7 +220,7 @@ class ConvolutionalAutoEncoder(nn.Module):
                  reconstruct_image=False,
                  backbone_name='resnet50'):
         super(ConvolutionalAutoEncoder, self).__init__()
-        self.backbone = get_backbone(backbone_name, None, freeze='Yes', conv_only=True)
+        self.backbone = get_backbone(backbone_name, None, freeze='No', conv_only=True)
         num_features_backbone = self.backbone.num_features
         if variational:
             self.autoencoder = VariationalAutoEncoder(

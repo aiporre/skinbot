@@ -76,7 +76,7 @@ def detection_model(model_name, num_classes, pretrained=True):
     return model
 
 
-def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=True):
+def segmentation_model(model_name, num_classes, freeze='No', learnable_upsample=True, **kwargs):
     model = UNet(in_channels=3, num_classes=num_classes, learnable_upsample=learnable_upsample)
     return model
 
@@ -197,7 +197,7 @@ def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', *
                 if p.requires_grad:
                     model_parameters.append(p)
         else:
-            model_parameters = model.parameters()
+            model_parameters = list(model.parameters())
         if len(model_parameters) == 0:
             logging.warning("No parameters detected in the model")
             return model, None

@@ -9,6 +9,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from skinbot.autoencoders import AutoEncoder, VariationalAutoEncoder, ConvolutionalAutoEncoder, AutoEncoderClassifier
+import torchextractor as tx
 from skinbot.config import Config
 from skinbot.dataset import crop_lesion, read_image
 import numpy as np
@@ -68,6 +69,111 @@ def plot_one_grad_cam(model, dataloader, target_mode= "single", fname=None, inde
     ax[1].imshow(visualization)
     ax[1].axis('off')
     return fig1, ax
+
+def plot_classification_features(model, dataloader, target_mode= "single", fname=None, index=0, target_layer="layer4.2.conv3",
+                                 device=None, dir='./feature_images', plot_image_next=False):
+    """
+    plots one calculation of grad cam on model by fiename or index
+    """
+    assert device is not None, 'device must be specified'
+
+    dataset = dataloader.dataset
+    if fname is not None:
+        logging.info('the fname will overwrites index while plotting the classification features be aware')
+        index = dataset.image_fnames.index(fname)
+    else:
+        fname = dataset.image_fnames[index]
+    logging.info(f"Plotting gradCAM for image: {fname} at index {index}")
+    # TODO: use variable targe_later +layer3.2.conv3
+    target_layers_objs = [model.layer4[-1]]
+
+    sample = dataset[index]
+    x,y = sample
+    x = torch.unsqueeze(x,0)
+    x = x.to(device)
+    # y = y.to(device)
+    if isinstance(target_layer, str):
+        target_layers = [target_layer]
+    elif isinstance(target_layer, list):
+        target_layers = target_layer
+    else:
+        raise ValueError(f'target_layer must be str or list of str, got {type(target_layer)}')
+
+    model = tx.Extractor(model, target_layers)
+    model.eval()
+    pred, features = model(x)
+    feature_shapes = {name: f.shape for name, f in features.items()}
+
+    print(feature_shapes)
+    rgb_img = (x - x.min())/(x.max()-x.min())
+    rgb_img = rgb_img.cpu().numpy().squeeze().transpose(1,2,0)
+    print(rgb_img.shape)
+    # plot all channels and save in images in directory
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    for name, f in features.items():
+        name = name.replace('.', '_')
+        fname = fname.replace('.jpg', '')
+        fname = fname.replace('.JPG', '')
+        fig_shape = min(16, f.shape[1])
+        for i in range(fig_shape):
+            image_fname = os.path.join(dir, f'{fname}_{name}_dim{i}.png')
+            print(image_fname)
+            if plot_image_next:
+                fig, ax = plt.subplots(1, 2, figsize=(5, 5))  # figsize(x,y)
+                feature_image = f[0, i].cpu().detach().numpy()
+                # feature_image = (feature_image - feature_image.min())/(feature_image.max()-feature_image.min())
+                ax[0].imshow(rgb_img)
+                ax[1].imshow(feature_image)
+                # layout tight and axis off
+                ax[0].axis('off')
+                ax[1].axis('off')
+            else:
+                fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+                feature_image = f[0, i].cpu().detach().numpy()
+                ax.imshow(feature_image)
+                ax.axis('off')
+            plt.tight_layout()
+            plt.savefig(image_fname)
+        # plt.savefig(image_fname)
+        # plt.show()
+
+
+    use_cuda = torch.has_cuda
+    # cam = GradCAM(model=model, target_layers=target_layers_objs, use_cuda=use_cuda)
+    # targets = [ClassifierOutputTarget(y)]
+    #
+    # # You can also pass aug_smooth=True and eigen_smooth=True, to apply smoothing.
+    # grayscale_cam = cam(input_tensor=x, targets=targets)
+    #
+    # # fname_19 = os.path.join(dataset.images_dir, dataset.image_fnames[index])
+    # # if "crop" in target_mode:  # crop in target:
+    # #     rgb_img = read_image(fname_19).numpy() #.transpose(1, 2, 0)
+    # # else:
+    # #     rgb_img = read_image(fname_19).numpy()
+    # #     cc = dataset._crop_boxes[dataset.image_fnames[index]]
+    # #     rgb_img = crop_lesion(rgb_img, cc).transpose(1, 2, 0)
+    # # In this example grayscale_cam has only one image in the batch:
+    # # rgb_img = rgb_img/255.0
+
+    # plt.imshow(rgb_img)
+    # plt.show()
+    # pred = model(rgb_img)
+    # fig1, ax = plt.subplots(ncols=2)
+    # grayscale_cam = grayscale_cam[0, :]
+    # # resize to original shape of image
+    # # shape = list(dataset.get_image_shape(index))
+    # # rgb_img = resize(rgb_img, shape)
+    # # grayscale_cam = resize(grayscale_cam, shape[1:])
+    # visualization = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True, image_weight=0.6)
+    # # visualization = resize(visualization, output_shape=dataset.get_image_shape(index)).transpose(1, 2, 0)
+    # ax[0].imshow(rgb_img)
+    # ax[0].axis('off')
+    # ax[0].set_title(dataset.image_fnames[index])
+    # ax[1].imshow(visualization)
+    # ax[1].axis('off')
+    # return fig1, ax
+
 
 def predict_samples(model, dataloader, fold, target_mode, N=None, device=None):
     model.eval()
@@ -273,6 +379,18 @@ def plot_detection(image, pred, label, all_titles_labels, save=True, show=False,
             text.set_bbox(dict(facecolor=colors[label_i][1], alpha=0.5, edgecolor='black'))
         ax[0,1].set_title('predictions')
     else:
+        images = []
+        for img in dataset[:16]:
+            images.append(img[0].cpu().numpy().transpose(1, 2, 0)) #C,H,W, H.W,C
+        # create plot grid  4x4
+        fig, ax = plt.subplots(4, 4, figsize=(10, 10))
+        for i in range(4):
+            for j in range(4):
+                index = i*4+j
+                ax[i,j].imshow(images[index])
+                ax[i,j].axis('off')
+        plt.show()
+
         fig, ax = plt.subplots(2, 2, figsize=(10, 5))
         fig.suptitle(f'{fname}')
         ax[0,0].imshow(image)

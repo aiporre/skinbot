@@ -87,8 +87,8 @@ class LabelConstantsBland:
     }
 
     target_weights = {
-        'normal': 0.77,
-        'bland': 0.20,
+        'normal': 0.5,
+        'bland': 0.5,
     }
 
     fixed_error_labels = {
@@ -99,7 +99,8 @@ class LabelConstantsBland:
         'necrosis': 'normal',
         'malignant': 'normal',
         'pyoderma': 'normal',
-        'infection': 'normal'
+        'infection': 'normal',
+        'malignant': 'normal'
     }
 
     num_classes = len(target_str_to_num)
@@ -171,6 +172,50 @@ class LabelSegmentation:
 
     num_classes = len(target_str_to_num)
 
+class LabelSegmentationWound:
+    target_str_to_num = {
+        'background': 0,
+        'blandSkin': 1,
+        'granulationTissue': 2,
+        'fibrin': 3,
+        'scar': 4,
+        'hyperpigmentation': 5,
+        'xerosis': 6,
+        'erythema': 7,
+        'maceratedSkin': 8,
+        'necrosis': 9,
+        'hematoma': 10,
+        'vessel': 11,
+        'poikoldermSkin': 12,
+        'hypertrophic': 13,
+        'scale': 14
+    }
+
+    target_weights = {
+        'background': 1,
+        'blandSkin': 1,
+        'wound': 1,
+    }
+
+    fixed_error_labels = {
+        'background': 'background',
+        'blandSkin': 'blandSkin',
+        'granulationTissue': 'wound',
+        'fibrin': 'wound',
+        'scar': 'wound',
+        'hyperpigmentation': 'wound',
+        'xerosis': 'wound',
+        'erythema': 'wound',
+        'maceratedSkin': 'wound',
+        'necrosis': 'wound',
+        'hematoma': 'wound',
+        'vessel': 'wound',
+        'poikoldermSkin': 'wound',
+        'hypertrophic': 'wound',
+        'scale':'blandSkin' 
+    }
+
+    num_classes = len(target_str_to_num)
 
 class LabelConstantsDemo:
     target_str_to_num = {
@@ -313,6 +358,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsMNIST
         elif config['DATASET']['labels'].lower() == 'cifar10':
             self.labels = LabelConstantsCIFAR10
+        elif config['DATASET']['labels'].lower() == 'woundsegmentation':
+            self.labels = LabelSegmentationWound
         else:
             raise Exception('Dataset configuration not found.')
 

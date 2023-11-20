@@ -187,28 +187,32 @@ class WoundImages(Dataset):
             self.balance_dataset()
 
     def balance_dataset(self):
+        fix_label = C.labels.fixed_error_labels
+        print('fix label' , fix_label)
         def get_labels(fname):
-            label = fname.split("_")[0]
+            label = fname.split("_")[0].lower().strip()
+            if label in fix_label:
+                label = fix_label[label]
             return label
-
+        labels = C.labels.target_str_to_num
         # get the number of samples per class
         samples_per_class = {}
         for fname in self.image_fnames:
-            labels = get_labels(fname)
-            for k, v in labels.items():
-                if k not in samples_per_class:
-                    samples_per_class[k] = 0
-                samples_per_class[k] += 1
+            k = get_labels(fname)
+            if k not in samples_per_class:
+                samples_per_class[k] = 0
+            samples_per_class[k] += 1
         # get the minimum number of samples per class
+        print('---->>>> ', samples_per_class)
         min_samples = min(samples_per_class.values())
+        print('BALANCE TO min number of classes:' , min_samples, 'out of ', len(samples_per_class), ' classes found')
         # remove samples from the classes that have more samples than the minimum
         for fname in self.image_fnames:
-            labels = get_labels(fname)
-            for k, v in labels.items():
-                if samples_per_class[k] > min_samples:
-                    self.image_fnames.remove(fname)
-                    samples_per_class[k] -= 1
-                    break
+            k = get_labels(fname)
+            if samples_per_class[k] > min_samples:
+                self.image_fnames.remove(fname)
+                samples_per_class[k] -= 1
+                break
 
 
     def __fix_missing_files(self):
@@ -636,7 +640,8 @@ class WoundSegmentationImages(WoundImages):
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
-                image = rotation(image, angle=rotation, expand=True)
+                
+                image = rotate(image, angle=rotation, expand=True)
 
         except Exception as e:
             logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')

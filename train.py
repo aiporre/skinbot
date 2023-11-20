@@ -13,7 +13,8 @@ from skinbot.config import read_config, Config
 from skinbot.engine import create_classification_trainer, configure_engines, create_detection_trainer, \
     create_classification_evaluator, create_detection_evaluator, get_best_iteration, create_segmentation_trainer, \
     create_segmentation_evaluator, create_autoencoder_trainer, create_autoencoder_evaluator, get_last_checkpoint
-from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam, plot_latent_space, plot_detection
+from skinbot.evaluations import predict_samples, error_analysis, plot_one_grad_cam, plot_latent_space, plot_detection, \
+                                plot_classification_features
 from skinbot.models import get_model
 import skinbot.skinlogging as logging
 # from skinbot.transformers import num_classes, target_str_to_num
@@ -79,6 +80,12 @@ def main(best_or_last='best',
     train_dataloader = get_dataloaders(config, batch=batch_size, mode='train', fold_iteration=_fold, target=target_mode)
 
     # prepare models
+    print('------------> ', ae_model_path==-1)
+    if ae_model_path == -1:
+        ae_model_path = get_best_iteration('best_models', fold, model_name='convcvae', target_mode='reconstruction')
+        ae_model_path = os.path.join('best_models', ae_model_path)
+        print('best_model_path for autoencoder: ', ae_model_path)
+
     model, optimizer = get_model(model_name, optimizer=optimizer, lr=LR, momentum=momentum, freeze=freeze,
                                  ae_model_path=ae_model_path)
     # move model to gpu
@@ -115,6 +122,7 @@ def main(best_or_last='best',
         # plt.show()
         #
         # return
+        target_mode = target_mode.lower()
         if 'single' in target_mode or 'multiple' in target_mode or 'fuzzy' in target_mode:
             return evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader,
@@ -162,7 +170,7 @@ def evaluation_actions_reconstruction(C, config, evaluator, external_data, fold,
                 model.load_state_dict(torch.load(last_model_path)['weights'])
                 logging.info('last model loaded: %s' % model_path)
     plot_latent_space(model, num_classes=num_classes, device=device, data_loader=test_dataloader, save=save_fig,
-                      dim_red=None)
+                      dim_red='tsne')
     return 0
 
 def evaluation_actions_detection(C, config, trainer, evaluator, external_data, fold, model, model_name, model_path,
@@ -175,23 +183,28 @@ def evaluation_actions_detection(C, config, trainer, evaluator, external_data, f
     # evaluator.run(test_dataloader)
     # logging.info(f"TEST: evaluator.state.metrics' {evaluator.state.metrics} ")
     # plotting one detection result
+    # test_dataset = test_dataloader.dataset
     test_dataset = test_dataloader.dataset
     # get one image each
+    mask_plot = "mask" in model_name
     import random
-    for u in range(5):
-        N = random.randint(0, len(test_dataset))
-        image_test, label_test = test_dataset[N]
+    for u in range(len(test_dataset)):
+        N = random.randint(0, len(test_dataset)-1)
+        image_test, label_test = test_dataset[u]
+        fname = test_dataset.image_fnames[u]
         # get the prediction
         model.eval()
         with torch.no_grad():
             pred_test = model(image_test.unsqueeze(0).to(device))
         # plot the image and the prediction
-        plot_detection(image_test, pred_test, label_test, C.labels.target_str_to_num, save=True, show=False, mask=False, suffix=f'{u}')
+        plot_detection(image_test, pred_test, label_test, C.labels.target_str_to_num, save=True, show=False, mask=mask_plot, suffix=f'{u}', fname=fname)
+        #print('=====> fname', fname)
+        #plot_detection(image_test, [label_test], label_test, C.labels.target_str_to_num, save=True, show=False, mask=mask_plot, suffix=f'{u}', fname=fname)
     return 0
 
 
 def evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name, model_path,
-                                      target_mode, test_dataloader, train_dataloader):
+                                      target_mode, test_dataloader, train_dataloader, device, best_or_last):
     logging.info('dataset statistics')
     all_dataloader = get_dataloaders(config, batch=16, mode='all')
     all_labels = []
@@ -206,6 +219,16 @@ def evaluation_actions_classification(C, config, evaluator, external_data, fold,
         df_all['label_name'] = df_all['label'].apply(lambda x: target_num_to_str[x])
         # save the dataset statistics
         df_all.to_csv('./dataset_statistics.csv', index=False)
+
+    # plot features of a layer
+    logging.info("===> Plotting one grad CAM")
+    # ax, fig = plot_one_grad_cam(model, dataloader=test_dataloader, target_mode=target_mode, index=10)
+    plt.show()
+    # plot_classification_features(model, dataloader=test_dataloader, target_mode=target_mode, index=10, device=device)
+    plot_classification_features(model, dataloader=all_dataloader, target_mode=target_mode, index=2, device=device,
+                                 target_layer=['layer4.2.conv3', 'layer1.0.conv1'], fname='Malignant_117_IMAGIC_1608030190809.JPG')
+    os.abort()
+
     # sns.set(style="darkgrid")
     ax = sns.countplot(x="label_name", data=df_all)
     ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
@@ -233,7 +256,7 @@ def evaluation_actions_classification(C, config, evaluator, external_data, fold,
                 best_model_path = os.path.join('best_models', best_model_path)
                 model.load_state_dict(torch.load(best_model_path))
                 logging.info('best model loaded: ', model_path)
-        df = predict_samples(model, test_dataloader, fold, target_mode)
+        df = predict_samples(model, test_dataloader, fold, target_mode, device=device)
         df.to_csv(predictions_fname, index=False)
     logging.info(df.head())
     logging.info('prediction_results.csv saved')
@@ -263,10 +286,10 @@ if __name__ == "__main__":
 
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
-    # main(target_mode='cropSingle', patience=15, epochs=100, fold=0)
+    main(target_mode='cropSingle', patience=15, epochs=100, fold=0, only_eval=True)
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
     #main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
-    # main(target_mode='segmentation',  epochs=100, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
+    # main(target_mode='segmentation',  epochs=100000, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
     # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # files = os.listdir(PATH)
     # accuracies = {f: 0 for f in files}
@@ -309,20 +332,30 @@ if __name__ == "__main__":
     #      model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=model_path)
 
     # training classification autoencoder classifier
-    ae_model_path = None
-    main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001,
-         model_name='aec', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, model_path=model_path,
-         ae_model_path=ae_model_path)
+    # main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=16, lr=1E-03, model_name='convcvae',
+    #      freeze='layer4.0.conv3', optimizer='ADAM', only_eval=False)
+    # main(target_mode='reconstruction',  epochs=200, fold=0, batch_size=16, lr=1E-06, model_name='convcvae',
+    #      freeze='backbone', optimizer='ADAM', only_eval=True)
+    # ae_model_path = -1# best_models/best_fold=0_convcvae_reconstruction_malignant_model_negval=-489.7608.pt'
+    # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=1E-6,
+    #     model_name='aec', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False, model_path=model_path,
+    #     ae_model_path=ae_model_path)
+    # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=1E-6,
+    #     model_name='aec', freeze='encoder', optimizer='ADAM', only_eval=True, model_path=model_path,
+    #     ae_model_path=ae_model_path)
+    # 
     # training detection
-    #main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
-    #     freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    # main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
+    #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
 
-    main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
-         freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, best_or_last='last')
+    # main(target_mode='detection',  epochs=100, fold=0, batch_size=1, lr=0.000001, model_name='maskrcnn',
+    #      freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True, best_or_last='last')
     # training of autoencoders
-    # main(target_mode='reconstruction',  epochs=20, fold=0, batch_size=16, lr=1E-03, model_name='cvae',
-    #      freeze='No', optimizer='ADAM', only_eval=False)
+    # main(target_mode='reconstruction',  epochs=200, fold=0, batch_size=16, lr=1E-06, model_name='convcvae',
+    #      freeze='backbone', optimizer='ADAM', only_eval=False)
 
+    # main(target_mode='reconstruction',  epochs=200, fold=0, batch_size=16, lr=1E-06, model_name='convcvae',
+    #      freeze='backbone', optimizer='ADAM', only_eval=True)
 
 
     print('this is created from the browser :)')
