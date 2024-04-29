@@ -2,6 +2,9 @@ import json
 import os
 import random
 import csv
+from glob import glob
+from sklearn.model_selection import KFold as skKFold
+
 import skinbot.skinlogging as logging
 # try:
 #     import cv2
@@ -18,7 +21,7 @@ from torchvision.io import read_image
 from torchvision.transforms import Compose
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
     DetectionTarget, DetectionPretrained, PretrainedSegmentation, PretrainedMNIST, TargeOneHotfromNum, \
-    PretrainedReconstruction, PretrainedCIFAR10
+    PretrainedReconstruction, PretrainedCIFAR10, PretrainedHAM10000
 
 from skinbot.config import Config, LabelConstantsDetection
 from torchvision.transforms.functional import rotate
@@ -64,6 +67,15 @@ target_fix_names = {
     'dermatitis': 'dermatitis',
 }
 
+lesion_type_dict_ham10000 = {
+    'nv': 'Melanocytic nevi',
+    'mel': 'Melanoma',
+    'bkl': 'Benign keratosis-like lesions ',
+    'bcc': 'Basal cell carcinoma',
+    'akiec': 'Actinic keratoses',
+    'vasc': 'Vascular lesions',
+    'df': 'Dermatofibroma'
+}
 
 def fix_target(labels):
     labels_fixed = {}
@@ -143,6 +155,83 @@ class CIFAR10(Dataset):
 
     def __getitem__(self, index):
         return self._dataset[index]
+
+class HAM10000(Dataset):
+    # dataset ham10000 from https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DBW86T
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=5,
+                 test=False,
+                 transform=None,
+                 target_transform=None,
+                 *args, **kwargs):
+        # orchvision.datasets.MNIST(root: str, train: bool = True, transform: Optional[Callable] = None,
+        # target_transform: Optional[Callable] = None, download: bool = False)
+        assert os.path.exists(root_dir), 'root directoyr must exist %s' % root_dir
+        self.test = test
+        self.fold_iteration = fold_iteration
+        self.cross_validation_folds = cross_validation_folds
+        self.files, self.labels = self.get_files(root_dir)
+        self.transform = transform
+        self.target_transform = target_transform
+    def get_files(self, root_dir):
+        # search for 'HAM10000_metadata.csv' recursively in root_dir
+        metadata_file = None
+        for root, dirs, files in os.walk(root_dir):
+            for file in files:
+                if file == 'HAM10000_metadata.csv':
+                    metadata_file = os.path.join(root, file)
+                    break
+        if metadata_file is None:
+            raise Exception('HAM10000_metadata.csv not found in root_dir')
+        # read metadata_file
+        df = pd.read_csv(metadata_file)
+        # get the image filenames
+        image_id = df['image_id'].tolist()
+        # asser the image id are unique in the df
+        assert len(image_id) == len(set(image_id)), 'image_id are not unique'
+        imageid_path_dict = {os.path.splitext(os.path.basename(x))[0]: x
+                             for x in glob(os.path.join(root_dir, '*', '*.jpg'))}
+        df['path'] = df['image_id'].map(imageid_path_dict.get)
+        files = df['path'].tolist()
+        labels = df['dx'].tolist()
+        df['labels'] = labels
+        # print correspoding labels to unique values in dx
+        df_grouped = df.groupby('dx').agg({'labels': 'unique'})
+        logging.info("Unique labels in dx: %s" % df_grouped)
+        # shuffle files
+        indices = list(range(len(files)))
+        if not self.test:
+            random.shuffle(indices)
+        files = [files[i] for i in indices]
+        labels = [labels[i] for i in indices]
+        if self.fold_iteration:
+            k_fold = skKFold(n_splits=5, shuffle=True)
+            for i, (train_index, test_index) in enumerate(k_fold.split(files)):
+                if i == self.fold_iteration:
+                    if self.test:
+                        files = [files[i] for i in test_index]
+                        labels = [labels[i] for i in test_index]
+                    else:
+                        files = [files[i] for i in train_index]
+                        labels = [labels[i] for i in train_index]
+                    break
+        return files, labels
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, index):
+        image_path = self.files[index]
+        # read image
+        image = read_image(image_path) / 255.0
+        # get label
+        label = self.labels[index]
+        if self.transform:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
+
 
 class WoundImages(Dataset):
     def __init__(self, root_dir,
@@ -848,6 +937,48 @@ def get_dataloaders_reconstruction(config, batch, mode='all', fold_iteration=0):
 
     return dataloader
 
+def get_dataloaders_classification(config, batch, mode='all', fold_iteration=0):
+    root_dir = config['DATASET']['root']
+    labels_config = config['DATASET']['labels']
+    fuzzy_labels = False
+    _crop_lesion = True
+    if labels_config.lower() == 'mnist':
+        DatasetClass = MNIST
+        T = PretrainedMNIST
+        target_transform = TargeOneHotfromNum()
+    elif labels_config.lower() == 'cifar10':
+        DatasetClass = CIFAR10
+        T = PretrainedCIFAR10
+        target_transform = TargeOneHotfromNum()
+    elif labels_config.lower() == 'ham10000':
+        DatasetClass = HAM10000
+        T = PretrainedHAM10000
+        target_transform = TargetValue()
+    else:
+        DatasetClass = WoundImages
+        T = Pretrained
+        target_transform = Compose([TargetValue(), TargeOneHotfromNum()])
+
+    if mode == "all":
+        transform = T(test=True)
+        images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
+        shuffle_dataset = False
+    elif mode == 'test':
+        transform = T(test=True)
+        images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
+                              transform=transform, target_transform=target_transform)
+
+        shuffle_dataset = False
+    elif mode == 'train':
+        transform = T(test=False)
+        images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
+                              transform=transform, target_transform=target_transform)
+        shuffle_dataset = True
+
+    # wound_images.clear_missing_boxes()  # only labels with boxes are considered for training and evaluation of detection models
+    dataloader = DataLoader(images, batch_size=batch, shuffle=shuffle_dataset, num_workers=4)
+
+    return dataloader
 
 def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'):
     assert mode in ['all', 'test', 'train'], 'valid options to mode are \'all\' \'test\' \'train\'.'
@@ -856,7 +987,8 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
                      'detection',
                      'reconstruction',
                      'maskSingle',
-                     'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation']
+                     'cropFuzzy', 'cropOnehot', 'cropSingle', 'cropString', 'segmentation',
+                     'classification']
     assert target in valid_targets, f"Given {target}. Valid options to target mode are {valid_targets}"
     # TODO: FIX THIS TO new naems for target='fuzzylabel', multilabel, string and onehot
     root_dir = config['DATASET']['root']
@@ -897,6 +1029,10 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
         fuzzy_labels = True
         target_transform = FuzzyTargetValue()
         _crop_lesion = True
+    elif target.lower() == 'classification':
+        # TODO put targets onehot, single, string, cropOnehot, cropSingle, cropString fuzzy, cropfuzzy, cropmultiple..
+        # in the same function
+        return get_dataloaders_classification(config, batch, mode=mode, fold_iteration=fold_iteration)
     elif target.lower() == 'segmentation':
         return get_dataloaders_segmentation(config, batch, mode=mode, fold_iteration=fold_iteration, target=target)
     elif target.lower() == 'masksingle':  # TODO: maybe replace with startswith('mask')
