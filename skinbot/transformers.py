@@ -203,6 +203,38 @@ class PretrainedCIFAR10:
         else:
             return self.T['train'](x)
 
+class PretrainedHAM10000:
+    def __init__(self, test=False, input_size=32):
+        self.test = test
+        self.T = {
+            'train': transforms.Compose([
+                # transforms.ToTensor(),
+                MinMax(),
+                # transforms.RandomResizedCrop(input_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(90),
+                ToFloat(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ]),
+            'val': transforms.Compose([
+                # transforms.ToTensor(),
+                MinMax(),
+                transforms.Resize(input_size),
+                transforms.CenterCrop(input_size),
+                # transforms.ToTensor(),
+                ToFloat(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        }
+
+
+    def __call__(self, x):
+        if self.test:
+            return self.T['val'](x)
+        else:
+            return self.T['train'](x)
+
 
 class PadIfLess:
     def __init__(self, input_size):
