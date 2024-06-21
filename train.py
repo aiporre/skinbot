@@ -1,3 +1,5 @@
+import tqdm
+
 import skinbot.skinlogging
 import os
 import random
@@ -64,7 +66,7 @@ def main(best_or_last='best',
         device = torch.device('cpu')
     # prepare dataset
     assert validate_target_mode(target_mode, ['single', 'multiple', 'fuzzy','segmentation', 'detection',
-                                              'reconstruction'])
+                                              'reconstruction', 'classification'])
     if 'multiple' in target_mode.lower() or 'fuzzy' in target_mode.lower():
         assert config['DATASET']['labels'] == 'all', f'Target mode Multiple and fuzzy not compatible with labels in {config_file} use config[dataset][labels] = all'
     if 'detection' in target_mode:
@@ -89,7 +91,7 @@ def main(best_or_last='best',
     model, optimizer = get_model(model_name, optimizer=optimizer, lr=LR, momentum=momentum, freeze=freeze,
                                  ae_model_path=ae_model_path)
     # move model to gpu
-    model.to(device)
+    model = model.to(device)
     print(model)
     # create trainer and evaluator
     if 'detection' in target_mode:
@@ -123,7 +125,7 @@ def main(best_or_last='best',
         #
         # return
         target_mode = target_mode.lower()
-        if 'single' in target_mode or 'multiple' in target_mode or 'fuzzy' in target_mode:
+        if 'single' in target_mode or 'multiple' in target_mode or 'fuzzy' in target_mode or 'classification' in target_mode:
             return evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name,
                                                      model_path, target_mode, test_dataloader, train_dataloader,
                                                      device, best_or_last)
@@ -212,7 +214,7 @@ def evaluation_actions_classification(C, config, evaluator, external_data, fold,
     if os.path.exists('./dataset_statistics.csv'):
         df_all = pd.read_csv('./dataset_statistics.csv')
     else:
-        for x, y in all_dataloader:
+        for x, y in tqdm.tqdm(all_dataloader, desc="Collecting labels", total=len(all_dataloader)):
             all_labels.extend(y.tolist())
         df_all = pd.DataFrame(all_labels, columns=['label'])
         target_num_to_str = {v: k for k, v in C.labels.target_str_to_num.items()}
@@ -220,20 +222,25 @@ def evaluation_actions_classification(C, config, evaluator, external_data, fold,
         # save the dataset statistics
         df_all.to_csv('./dataset_statistics.csv', index=False)
 
+    a = df_all.groupby('label_name').count()
+    print(a)
+    print(df_all.describe())
+
     # plot features of a layer
     logging.info("===> Plotting one grad CAM")
     # ax, fig = plot_one_grad_cam(model, dataloader=test_dataloader, target_mode=target_mode, index=10)
-    plt.show()
+    # plt.show()
     # plot_classification_features(model, dataloader=test_dataloader, target_mode=target_mode, index=10, device=device)
-    plot_classification_features(model, dataloader=all_dataloader, target_mode=target_mode, index=2, device=device,
-                                 target_layer=['layer4.2.conv3', 'layer1.0.conv1'], fname='Malignant_117_IMAGIC_1608030190809.JPG')
-    os.abort()
+    # plot_classification_features(model, dataloader=all_dataloader, target_mode=target_mode, index=2, device=device,
+    #                              target_layer=['layer4.2.conv3', 'layer1.0.conv1'], fname='Malignant_117_IMAGIC_1608030190809.JPG')
+    # os.abort()
 
     # sns.set(style="darkgrid")
-    ax = sns.countplot(x="label_name", data=df_all)
+    ax = sns.countplot(x="label_name", data=df_all, palette=['#432371',"#FAAE7B"])
     ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
     ax.set_ylabel('Number of instances')
-    # plt.show()
+    plt.show()
+    os.abort()
     logging.info('Running evaluations Train and test (in that order).')
     evaluator.run(train_dataloader)
     logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
@@ -286,11 +293,13 @@ if __name__ == "__main__":
 
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
-    main(target_mode='cropSingle', patience=15, epochs=100, fold=0, only_eval=True)
+    # main(target_mode='cropSingle', patience=15, epochs=100, fold=0, only_eval=True)
+    # main(target_mode='classification', patience=15, epochs=100, fold=0, only_eval=True)
+
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
     #main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # main(target_mode='segmentation',  epochs=100000, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
-    # main(target_mode='detectionSingle',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='faster_rcnn_resnet50_fpn', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    main(target_mode='detection',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='fasterresnet50', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # files = os.listdir(PATH)
     # accuracies = {f: 0 for f in files}
     # for f in files: #os.listdir(PATH):

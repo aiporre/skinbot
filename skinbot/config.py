@@ -321,6 +321,34 @@ class LabelConstantsCIFAR10:
     }
 
     num_classes = len(target_str_to_num)
+    
+    
+class LabelConstantsHAM10000:
+    target_str_to_num = {
+        'nv': 0,
+        'mel': 1,
+        'bkl': 2,
+        'bcc': 3,
+        'akiec': 4,
+        'vasc': 5,
+        'df': 6
+    }
+
+    target_weights = {
+        'nv': 1,
+        'mel': 1,
+        'bkl': 1,
+        'bcc': 1,
+        'akiec': 1,
+        'vasc': 1,
+        'df':  1
+    }
+
+    fixed_error_labels = {
+        'dummy': 'blue'
+    }
+
+    num_classes = len(target_str_to_num)
 def read_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config.read(config_file)
@@ -360,6 +388,8 @@ class Config(metaclass=SingletonMeta):
             self.labels = LabelConstantsCIFAR10
         elif config['DATASET']['labels'].lower() == 'woundsegmentation':
             self.labels = LabelSegmentationWound
+        elif config['DATASET']['labels'].lower() == 'ham10000':
+            self.labels = LabelConstantsHAM10000
         else:
             raise Exception('Dataset configuration not found.')
 

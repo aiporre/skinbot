@@ -272,7 +272,7 @@ class WoundImages(Dataset):
         self._crop_boxes = {}
 
         # check if flag balance is true
-        if C.config['DATASET']['balance']:
+        if C.config['DATASET']['balance'] == "True":
             self.balance_dataset()
 
     def balance_dataset(self):

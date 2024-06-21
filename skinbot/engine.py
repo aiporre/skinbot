@@ -378,7 +378,7 @@ def create_segmentation_evaluator(model, device=None):
 
 def create_classification_trainer(model, optimizer, target_mode, device=None):
     # make loss according to target mode
-    if 'single' in target_mode.lower():
+    if 'single' in target_mode.lower() or 'classification' in target_mode.lower():
         # compute inverse of class weights
         v_max = max(C.labels.target_weights.values())
         target_values_norm = [v_max / v for v in C.labels.target_weights.values()]
@@ -405,7 +405,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         # TODO: fix evaluation broken
         if validate_target_mode(target_mode, ['fuzzy', 'multiple']):
             y_argmax = torch.argmax(y, dim=1)
-        elif 'single' in target_mode.lower():
+        elif 'single' in target_mode.lower() or 'classification' in target_mode.lower():
             y_argmax = y.long()
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
@@ -421,7 +421,7 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
         if 'fuzzy' in target_mode.lower() or 'multiple' in target_mode.lower():
             #  target_mode in ['fuzzy', 'multiple']:
             y_argmax = torch.argmax(y, dim=1)
-        elif 'single' in target_mode.lower():
+        elif 'single' in target_mode.lower() or 'classification' in target_mode.lower():
             y_argmax = y.long()
         else:
             raise ValueError(f"target_mode={target_mode} is not supported")
