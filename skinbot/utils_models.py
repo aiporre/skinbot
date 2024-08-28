@@ -12,7 +12,7 @@ from skinbot.segmentation import pad_to_match
 C = Config()
 
 
-def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.5):
+def get_mlp(num_inputs, num_outputs, layers=None, dropout=0.1):
     layers = [1024] if layers is None else layers
     instances = []
     for l in layers:
@@ -101,7 +101,7 @@ class SmallCNN(nn.Module):
 
         fc_layers_dims = eval(C.config['MODELS']['fc_layers'])
         if len(fc_layers_dims) > 0:
-            self.fc = get_mlp(self.num_middle, num_classes, layers=fc_layers_dims, dropout=0.5)
+            self.fc = get_mlp(self.num_middle, num_classes, layers=fc_layers_dims, dropout=0.2)
         else:
             self.fc = PlainLayer()
 
@@ -139,7 +139,7 @@ def freeze_before_conv(model, last_conv):
     return model
 
 
-def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_only=False):
+def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_only=False, layers=None):
 
     if model_name == 'resnet101':
         weights = models.ResNet101_Weights.DEFAULT  # if pretrained else None
@@ -153,7 +153,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
         backbone.num_features = num_features
-        backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)
+        backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs, layers=layers)
     elif model_name == 'resnet50':
         weights = models.ResNet50_Weights.DEFAULT  # if pretrained else None
         T = weights.transforms()
@@ -166,7 +166,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
         backbone.num_features = num_features
-        backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+        backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs, layers=layers)  # nn.Linear(num_features, num_outputs)
     elif model_name == 'resnet18':
         weights = models.ResNet18_Weights.DEFAULT  # if pretrained else None
         T = weights.transforms()
@@ -179,7 +179,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             print_trainable_parameters(backbone)
         num_features = backbone.fc.in_features
         backbone.num_features = num_features
-        backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+        backbone.fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs, layers=layers)  # nn.Linear(num_features, num_outputs)
     elif model_name == 'vgg19':
         weights = models.VGG19_Weights.DEFAULT  # if pretrained else None
         T = weights.transforms()
@@ -192,7 +192,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             print_trainable_parameters(backbone)
         num_features = 512 * 7 * 7  # backbone.classifier.in_features
         backbone.num_features = num_features
-        backbone.classifier = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+        backbone.classifier = PlainLayer() if conv_only else get_mlp(num_features, num_outputs, layers=layers)  # nn.Linear(num_features, num_outputs)
     elif model_name == 'vgg16':
         weights = models.VGG16_Weights.DEFAULT  # if pretrained else None
         T = weights.transforms()
@@ -205,7 +205,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             print_trainable_parameters(backbone)
         num_features = 512 * 7 * 7  # backbone.classifier.in_features
         backbone.num_features = num_features
-        backbone.classifier = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+        backbone.classifier = PlainLayer() if conv_only else get_mlp(num_features, num_outputs, layers=layers)  # nn.Linear(num_features, num_outputs)
     elif model_name.lower() == 'smallcnn':
         backbone = SmallCNN(num_classes=num_outputs)
         backbone.num_features = backbone.num_middle

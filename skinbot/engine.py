@@ -1,4 +1,7 @@
 import copy
+
+from ignite.metrics.confusion_matrix import cmPrecision, cmRecall
+
 import skinbot.skinlogging as logging
 import math
 import os
@@ -383,7 +386,9 @@ def create_classification_trainer(model, optimizer, target_mode, device=None):
         v_max = max(C.labels.target_weights.values())
         target_values_norm = [v_max / v for v in C.labels.target_weights.values()]
         target_weights_tensor = torch.tensor(target_values_norm, dtype=torch.float32, device=device)
-        criterion = FocalLoss() # torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
+        # criterion = FocalLoss() # torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
+        logging.info(f'using target weights {target_values_norm}')
+        criterion = torch.nn.CrossEntropyLoss(weight=target_weights_tensor)
     elif 'multiple' in target_mode.lower():
         criterion = MulticlassLoss()
     elif 'fuzzy' in target_mode.lower():
@@ -439,10 +444,8 @@ def create_classification_evaluator(model, criterion, target_mode, device=None):
             output_transform=pred_thresholded),
         "nll": Loss(criterion),
         "cm": ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot),
-        'cosine': Loss(CosineLoss()) if validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Loss(
-            torch.nn.CrossEntropyLoss()),
-        'euclidean': Loss(EuclideanLoss()) if validate_target_mode(target_mode, ['fuzzy', 'multiple']) else Loss(
-            torch.nn.CrossEntropyLoss()),
+        'precision': cmPrecision(ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot)),
+        'recall': cmRecall(ConfusionMatrix(num_classes=C.labels.num_classes, output_transform=pred_in_onehot)),
     }
 
     evaluator = create_supervised_evaluator(model, metrics=val_metrics, device=device)
@@ -495,8 +498,8 @@ def configure_engines_classification(target_mode,
             f"Training Results - Epoch: {engine.state.epoch} "
             f"Avg accuracy: {avg_accuracy:.2f} "
             f"Avg loss: {avg_nll:.2f} "
-            f"Avg Cosine: {metrics['cosine']:.2f}"
-            f"Avg Euclidean: {metrics['euclidean']:.2f}")
+            f"Avg Recall: {metrics['recall']:.2f}"
+            f"Avg Precision: {metrics['recall']:.2f}")
 
     @trainer.on(Events.EPOCH_COMPLETED(every=2))
     def log_validation_results(engine):
@@ -509,8 +512,8 @@ def configure_engines_classification(target_mode,
             f"Validation Results - Epoch: {engine.state.epoch} "
             f"Avg accuracy: {avg_accuracy:.2f} "
             f"Avg loss: {avg_nll:.2f} "
-            f"Avg Cosine {metrics['cosine']:.2f}"
-            f"Avg Euclidean: {metrics['euclidean']:.2f}")
+            f"Avg precision {metrics['precision']:.2f}"
+            f"Avg recall: {metrics['recall']:.2f}")
         evaluator.state.metrics['negloss'] = -avg_nll
 
         pbar.n = pbar.last_print_n = 0

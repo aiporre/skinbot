@@ -16,7 +16,7 @@ class LabelConstantsAll:
 
     target_weights = {
         'contact': 0.08,
-        'vasculitis': 0.05,
+        'vasculitis': 0.20,
         'necrosis': 0.05,
         'malignant': 0.23,
         'pyoderma': 0.07,
@@ -39,7 +39,7 @@ class LabelConstantsMalignant:
 
     target_weights = {
         'normal': 0.5,
-        'malignant': 0.5,
+        'malignant': 0.05,
     }
 
     fixed_error_labels = {
@@ -64,7 +64,7 @@ class LabelConstantsInfection:
 
     target_weights = {
         'normal': 0.77,
-        'infection': 0.20,
+        'infection': 0.1,
     }
 
     fixed_error_labels = {

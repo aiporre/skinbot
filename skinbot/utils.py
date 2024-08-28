@@ -106,6 +106,7 @@ def load_models(model, model_path, device):
     # GPU->GPU
     # Load
     try:
+        print('Trying to load model: ', model_path)
         model.load_state_dict(torch.load(model_path))
         model.to(device)
     except:
