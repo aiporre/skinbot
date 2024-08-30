@@ -17,7 +17,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from torchvision.io import read_image
+from torchvision.io import read_image, ImageReadMode
 from torchvision.transforms import Compose
 from skinbot.transformers import TargetOneHot, TargetValue, Pretrained, FuzzyTargetValue, \
     DetectionTarget, DetectionPretrained, PretrainedSegmentation, PretrainedMNIST, TargeOneHotfromNum, \
@@ -93,6 +93,7 @@ def fix_target(labels):
 def crop_lesion(img, boxes):
     if len(boxes) == 0:
         return img
+    random_bumber = random.randint(0, 100000)
     xmin, ymin, xmax, ymax = min(boxes[:, 0]), min(boxes[:, 1]), max(boxes[:, 2]), max(boxes[:, 3])
     img = img[:, ymin.int():ymax.int(), xmin.int():xmax.int()]
     return img
@@ -458,7 +459,7 @@ class WoundImages(Dataset):
         # read the image and converts to float by multiplying by 1.0
         image_path = os.path.join(self.images_dir, self.image_fnames[index])
         try:
-            image = minmax(read_image(image_path))  #read_image(image_path) / 1.0 
+            image = minmax(read_image(image_path, mode=ImageReadMode.RGB))  #read_image(image_path) / 1.0
             rotation = get_image_rotation(image_path)
             if rotation is not None:
                 # then rotate the image
@@ -485,6 +486,60 @@ class WoundImages(Dataset):
         # apply the transformation to each case image and label
         if self.transform and not self.create_detection:
             image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return image, label
+
+class WoundBoxesImages(WoundImages):
+    def __init__(self, root_dir,
+                 fold_iteration=None,
+                 cross_validation_folds=5,
+                 test=False,
+                 transform=None,
+                 target_transform=None):
+        super(WoundBoxesImages, self).__init__(root_dir,
+                                               fold_iteration=fold_iteration,
+                                               cross_validation_folds=cross_validation_folds,
+                                               test=test,
+                                               crop_lesion=False,
+                                               fuzzy_labels=False,
+                                               detection=True,
+                                               transform=transform,
+                                               target_transform=target_transform)
+        path_to_boxes = os.path.join(root_dir, 'boxes.csv')
+        df_boxes = pd.read_csv(path_to_boxes)
+        self.boxes = []
+        for index, row in df_boxes.iterrows():
+            # filter the fname that in in self.image_fnames
+            if row['fname'] in self.image_fnames:
+                self.boxes.append(row.to_dict())
+    def __len__(self):
+        return len(self.boxes)
+    def __getitem__(self, index):
+        fname = self.boxes[index]['fname']
+        image_path = os.path.join(self.images_dir, fname )
+        try:
+            image = read_image(image_path, mode = ImageReadMode.RGB) / 255.0
+            rotation = get_image_rotation(image_path)
+            if rotation is not None:
+                # then rotate the image
+                image = rotate(image, angle=rotation, expand=True)
+        except Exception as e:
+            logging.error(f'Cannot read image: {image_path}, check file. Error message: {e}')
+            raise e
+        # extract the label
+        label = fname.split("_")[0]
+        # crop lesion
+        cc = np.array([[self.boxes[index]['c00'], self.boxes[index]['c01'], self.boxes[index]['c10'], self.boxes[index]['c11']]])
+        cc = torch.as_tensor(cc, dtype=torch.long)
+        # check if the box fits the image
+        if cc[0][0] < 0 or cc[0][1] < 0 or cc[0][2] > image.shape[2] or cc[0][3] > image.shape[1]:
+            logging.error(f'Box {cc} is out of image {fname} bounds')
+            raise ValueError(f'Box {cc} is out of image {fname} bounds, image shape: {image.shape}')
+        image = crop_lesion(image, cc)
+        # transform image and label
+        if self.transform:
+            image  = self.transform(image)
         if self.target_transform:
             label = self.target_transform(label)
         return image, label
@@ -955,9 +1010,12 @@ def get_dataloaders_classification(config, batch, mode='all', fold_iteration=0):
         T = PretrainedHAM10000
         target_transform = TargetValue()
     else:
-        DatasetClass = WoundImages
+        if C.config['DATASET']['boxes'] == "True":
+            DatasetClass = WoundBoxesImages
+        else:
+            DatasetClass = WoundImages
         T = Pretrained
-        target_transform = Compose([TargetValue(), TargeOneHotfromNum()])
+        target_transform = Compose([TargetValue()])
 
     if mode == "all":
         transform = T(test=True)

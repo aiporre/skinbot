@@ -78,24 +78,24 @@ class Pretrained:
         self.test = test
         self.T = {
             'train': transforms.Compose([
-                    # transforms.Resize(input_size),
+                    transforms.Resize(input_size),
                     # transforms.CenterCrop(input_size),
                     transforms.RandomResizedCrop(input_size, scale=(0.8,0.8)),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.RandomVerticalFlip(),
-                    transforms.RandomRotation(90),
+                    # transforms.RandomHorizontalFlip(),
+                    # transforms.RandomVerticalFlip(),
+                    # transforms.RandomRotation(90),
                     # ToLong(),
                     # transforms.ColorJitter(brightness=0.5, hue=0.3),
                     #transforms.ToTensor(),
                     ToFloat(),
-                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    transforms.Normalize([0.484, 0.454, 0.403], [0.226, 0.223, 0.222])
                 ]),
             'val': transforms.Compose([
                     transforms.Resize(232),
                     transforms.CenterCrop(input_size),
                     # transforms.ToTensor(),
                     ToFloat(),
-                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                    transforms.Normalize([0.226, 0.223, 0.222], [0.226, 0.223, 0.222])
                 ])
         }
 
