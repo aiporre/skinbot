@@ -192,7 +192,47 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             print_trainable_parameters(backbone)
         num_features = 512 * 7 * 7  # backbone.classifier.in_features
         backbone.num_features = num_features
-        backbone.classifier = PlainLayer() if conv_only else get_mlp(num_features, num_outputs, layers=layers)  # nn.Linear(num_features, num_outputs)
+        backbone.classifier = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+    elif model_name == 'efficientnet-b0':
+        weights = models.EfficientNetB0_Weights.DEFAULT
+        T = weights.transforms()
+        backbone = models.efficientnet_b0(weights=weights)
+        if freeze == 'yes':
+            backbone = freeze_model(backbone)
+        elif freeze != 'no':
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
+        num_features = backbone._fc.in_features
+        backbone.num_features = num_features
+        backbone._fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)  # nn.Linear(num_features, num_outputs)
+    elif model_name == 'efficientnet-b1':
+        weights = models.EfficientNetB1_Weights.DEFAULT
+        T = weights.transforms()
+        backbone = models.efficientnet_b1(weights=weights)
+        if freeze == 'yes':
+            backbone = freeze_model(backbone)
+        elif freeze != 'no':
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
+        num_features = backbone._fc.in_features
+        backbone.num_features = num_features
+        backbone._fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)
+    elif model_name == 'efficientnet-b2':
+        weights = models.EfficientNetB2_Weights.DEFAULT
+        T = weights.transforms()
+        backbone = models.efficientnet_b2(weights=weights)
+        if freeze == 'yes':
+            backbone = freeze_model(backbone)
+        elif freeze != 'no':
+            backbone = freeze_before_conv(backbone, last_conv=freeze)
+            logging.info(f"Freezing all layers before {freeze}")
+            print_trainable_parameters(backbone)
+        num_features = backbone._fc.in_features
+        backbone.num_features = num_features
+        backbone._fc = PlainLayer() if conv_only else get_mlp(num_features, num_outputs)
+
     elif model_name == 'vgg16':
         weights = models.VGG16_Weights.DEFAULT  # if pretrained else None
         T = weights.transforms()
