@@ -9,7 +9,7 @@ import torch
 # from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from skinbot.autoencoders import AutoEncoder, VariationalAutoEncoder, ConvolutionalAutoEncoder, AutoEncoderClassifier
-import torchextractor as tx
+# import torchextractor as tx
 from skinbot.config import Config
 from skinbot.dataset import crop_lesion, read_image
 import numpy as np
