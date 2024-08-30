@@ -7,6 +7,8 @@ import random
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.use('Agg')
 import seaborn as sns
 from sklearn.metrics import classification_report, ConfusionMatrixDisplay, confusion_matrix
 
@@ -208,7 +210,7 @@ def evaluation_actions_detection(C, config, trainer, evaluator, external_data, f
 def evaluation_actions_classification(C, config, evaluator, external_data, fold, model, model_name, model_path,
                                       target_mode, test_dataloader, train_dataloader, device, best_or_last):
     logging.info('dataset statistics')
-    all_dataloader = get_dataloaders(config, batch=16, mode='all')
+    all_dataloader = get_dataloaders(config, batch=16, target=target_mode, mode='all', fold_iteration=fold)
     all_labels = []
     # collect all labels in a list
     if os.path.exists('./dataset_statistics.csv'):
@@ -236,11 +238,11 @@ def evaluation_actions_classification(C, config, evaluator, external_data, fold,
     # os.abort()
 
     # sns.set(style="darkgrid")
-    ax = sns.countplot(x="label_name", data=df_all, palette=['#432371',"#FAAE7B"])
+    ax = sns.countplot(x="label_name", data=df_all)
     ax.set_xticklabels(ax.get_xticklabels(), rotation=40, ha="right")
     ax.set_ylabel('Number of instances')
     plt.show()
-    os.abort()
+    # os.abort()
     logging.info('Running evaluations Train and test (in that order).')
     evaluator.run(train_dataloader)
     logging.info(f"TRAIN: evaluator.state.metrics {evaluator.state.metrics}")
@@ -262,7 +264,7 @@ def evaluation_actions_classification(C, config, evaluator, external_data, fold,
             if best_model_path is not None:
                 best_model_path = os.path.join('best_models', best_model_path)
                 model.load_state_dict(torch.load(best_model_path))
-                logging.info('best model loaded: ', model_path)
+                logging.info('best model loaded: %s' % model_path)
         df = predict_samples(model, test_dataloader, fold, target_mode, device=device)
         df.to_csv(predictions_fname, index=False)
     logging.info(df.head())
@@ -294,12 +296,18 @@ if __name__ == "__main__":
     # main(target_mode='multiple', patience=None, epochs=100, fold=0)
     # main(target_mode='fuzzy', patience=15, epochs=100, fold=0)
     # main(target_mode='cropSingle', patience=15, epochs=100, fold=0, only_eval=True)
-    # main(target_mode='classification', patience=15, epochs=100, fold=0, only_eval=True)
+    # main(target_mode='classification', patience=None, epochs=1000, fold=0, only_eval=False, lr=0.000001,
+    #      model_name='aec', batch_size=16, freeze='backbone',
+    #      ae_model_path="best_models/best_fold=0_convcvae_reconstruction_all_model_negval=-384.6488.pt")
+
+    main(target_mode='classification', patience=None, epochs=100, fold=0, only_eval=True, lr=0.0001,
+         model_name='resnet101', batch_size=16, freeze='layer4.2.conv3', optimizer="ADAM",
+         ae_model_path="best_models/best_fold=0_convcvae_reconstruction_all_model_negval=-384.6488.pt")
 
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=0.001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=True)
     #main(target_mode='multiple',  epochs=100, fold=0, batch_size=32, lr=0.00001, model_name='resnet101', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # main(target_mode='segmentation',  epochs=100000, fold=0, batch_size=16, lr=0.00001, model_name='unet', freeze='No', optimizer='ADAM', only_eval=False)
-    main(target_mode='detection',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='fasterresnet50', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
+    # main(target_mode='detection',  epochs=100, fold=0, batch_size=4, lr=0.000001, model_name='fasterresnet50', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False)
     # files = os.listdir(PATH)
     # accuracies = {f: 0 for f in files}
     # for f in files: #os.listdir(PATH):
@@ -344,12 +352,12 @@ if __name__ == "__main__":
     # main(target_mode='reconstruction',  epochs=100, fold=0, batch_size=16, lr=1E-03, model_name='convcvae',
     #      freeze='layer4.0.conv3', optimizer='ADAM', only_eval=False)
     # main(target_mode='reconstruction',  epochs=200, fold=0, batch_size=16, lr=1E-06, model_name='convcvae',
-    #      freeze='backbone', optimizer='ADAM', only_eval=True)
+    #       freeze='backbone', optimizer='ADAM', only_eval=False)
     # ae_model_path = -1# best_models/best_fold=0_convcvae_reconstruction_malignant_model_negval=-489.7608.pt'
     # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=1E-6,
     #     model_name='aec', freeze='layer4.2.conv3', optimizer='ADAM', only_eval=False, model_path=model_path,
     #     ae_model_path=ae_model_path)
-    # main(target_mode='cropSingle',  epochs=100, fold=0, batch_size=32, lr=1E-6,
+    # main(target_mode='classification',  epochs=100, fold=0, batch_size=32, lr=1E-6,
     #     model_name='aec', freeze='encoder', optimizer='ADAM', only_eval=True, model_path=model_path,
     #     ae_model_path=ae_model_path)
     # 

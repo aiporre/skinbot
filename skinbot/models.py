@@ -16,10 +16,12 @@ from skinbot.utils_models import get_backbone, freeze_model, freeze_before_conv
 C = Config()
 
 
-def classification_model(model_name, num_outputs, freeze='No', pretrained=True, ae_model_path=None):
+
+def classification_model(model_name, num_outputs, freeze='No', pretrained=True, ae_model_path=None, **kwargs):
     freeze = freeze.lower()
     backbone = None
     input_size = 224
+    kwargs['layers'] = eval(C.config['MODELS']['fc_layers'])
     if model_name == 'aec':
         # load an autoencoder model
         assert ae_model_path is not None, 'You need to provide a path to the autoencoder model'
@@ -36,10 +38,10 @@ def classification_model(model_name, num_outputs, freeze='No', pretrained=True, 
             pass
         else:
             backbone_autoencoder = freeze_before_conv(backbone_autoencoder, freeze)
-        model = AutoEncoderClassifier(backbone_autoencoder, num_outputs)
+        model = AutoEncoderClassifier(backbone_autoencoder, num_outputs, **kwargs)
         return model
     else:
-        return get_backbone(model_name, num_outputs, freeze='No', pretrained=True)
+        return get_backbone(model_name, num_outputs, freeze='No', pretrained=True, **kwargs)
 
 
 def detection_model(model_name, num_classes, pretrained=True):
@@ -181,6 +183,9 @@ def autoencoder_model(model_name, num_classes, freeze='No', **kwargs):
 def get_model(model_name, optimizer=None, lr=0.001, momentum=0.8, freeze='No', **kwargs):
     model_name = model_name.lower()
     if model_name.startswith('resnet') or model_name.startswith('vgg') or model_name == 'smallcnn' or model_name == 'aec':
+        layers = eval(C.config['MODELS']['fc_layers'])
+        logging.info(f"fc_layers: {layers}")
+        kwargs['layers'] = layers
         model = classification_model(model_name, num_outputs=C.labels.num_classes, freeze=freeze, **kwargs)
     elif 'faster' in model_name or 'mask' in model_name:
         model = detection_model(model_name, C.labels.num_classes)

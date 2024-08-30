@@ -19,8 +19,8 @@ from skinbot.losses import MulticlassLoss, CosineLoss, EuclideanLoss, FocalLoss
 from skinbot.utils import validate_target_mode, get_log_path, make_patches, join_patches, load_models
 from skinbot.config import Config
 
-from skinbot.torchvisionrefs.coco_eval import CocoEvaluator
-from skinbot.torchvisionrefs.coco_utils import convert_to_coco_api
+# from skinbot.torchvisionrefs.coco_eval import CocoEvaluator
+# from skinbot.torchvisionrefs.coco_utils import convert_to_coco_api
 
 C = Config()
 
@@ -747,39 +747,39 @@ def configure_engines_detection(target_mode,
                                 model_path,
                                 device):
     from itertools import chain
-
-    # configure evaluator coco api wrapper functions
-    test_dataset = test_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(test_dataloader))
-    coco_api_test_dataset = convert_to_coco_api(test_dataset)
-    train_dataset = train_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(train_dataloader))
-    coco_api_train_dataset = convert_to_coco_api(train_dataset)
-
-    def get_coco_evaluator_train():
-        return CocoEvaluator(coco_api_train_dataset, infer_ioutypes_coco_api(model))
-    def get_coco_evaluator_test():
-        return CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
-    trainer.state.get_coco_evaluator = get_coco_evaluator_train
-    evaluator.state.get_coco_evaluator = get_coco_evaluator_test
-
-    @evaluator.on(Events.COMPLETED)
-    def on_evaluation_completed(engine):
-        # gather the stats from all processes
-        engine.state.coco_evaluator.synchronize_between_processes()
-
-        # accumulate predictions from all images
-        engine.state.coco_evaluator.accumulate()
-        engine.state.coco_evaluator.summarize()
-        # loading metric values (using hard-code values from coco eval api)
-        # Average precision and average recall sets in this order:
-        # 1. Iou 0.5 to 0.95 (all areas)
-        # 2. Iou 0.5 (all areas)
-        # 3. Iou 0.76 (all areas)
-        # 4. Iou 0.5 to 0.95 (medium areas)
-        # 5. Iou 0.5 to 0.95 (large areas)
-        engine.state.metrics = {}
-        for k, coco_eval in engine.state.coco_evaluator.coco_eval.items():
-            if len(coco_eval.stats) > 0:
-                engine.state.metrics[f'IoU_precision_0.5_{k}'] = coco_eval.stats[1]
+    return None
+    # # configure evaluator coco api wrapper functions
+    # test_dataset = test_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(test_dataloader))
+    # coco_api_test_dataset = convert_to_coco_api(test_dataset)
+    # train_dataset = train_dataloader.dataset # chain.from_iterable(zip(*batch) for batch in iter(train_dataloader))
+    # coco_api_train_dataset = convert_to_coco_api(train_dataset)
+    #
+    # def get_coco_evaluator_train():
+    #     return CocoEvaluator(coco_api_train_dataset, infer_ioutypes_coco_api(model))
+    # def get_coco_evaluator_test():
+    #     return CocoEvaluator(coco_api_test_dataset, infer_ioutypes_coco_api(model))
+    # trainer.state.get_coco_evaluator = get_coco_evaluator_train
+    # evaluator.state.get_coco_evaluator = get_coco_evaluator_test
+    #
+    # @evaluator.on(Events.COMPLETED)
+    # def on_evaluation_completed(engine):
+    #     # gather the stats from all processes
+    #     engine.state.coco_evaluator.synchronize_between_processes()
+    #
+    #     # accumulate predictions from all images
+    #     engine.state.coco_evaluator.accumulate()
+    #     engine.state.coco_evaluator.summarize()
+    #     # loading metric values (using hard-code values from coco eval api)
+    #     # Average precision and average recall sets in this order:
+    #     # 1. Iou 0.5 to 0.95 (all areas)
+    #     # 2. Iou 0.5 (all areas)
+    #     # 3. Iou 0.76 (all areas)
+    #     # 4. Iou 0.5 to 0.95 (medium areas)
+    #     # 5. Iou 0.5 to 0.95 (large areas)
+    #     engine.state.metrics = {}
+    #     for k, coco_eval in engine.state.coco_evaluator.coco_eval.items():
+    #         if len(coco_eval.stats) > 0:
+    #             engine.state.metrics[f'IoU_precision_0.5_{k}'] = coco_eval.stats[1]
 
     def infer_ioutypes_coco_api(_model):
         if isinstance(_model, torchvision.models.detection.FasterRCNN):
