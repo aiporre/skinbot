@@ -930,19 +930,20 @@ def get_dataloaders_mask(config, batch, mode='all', fold_iteration=0):
     fuzzy_labels = False
     _crop_lesion = True
     target_transform = TargetValue()
+    input_size = eval(C.config['MODELS']['input_size'])
 
     if mode == "all":
-        transform = Pretrained(test=True)
+        transform = Pretrained(test=True, input_size=input_size)
         wound_images = WoundMaskedImages(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = Pretrained(test=True)
+        transform = Pretrained(test=True, input_size=input_size)
         wound_images = WoundMaskedImages(root_dir, fold_iteration=fold_iteration, test=True,
                                          transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
-        transform = Pretrained(test=False)
+        transform = Pretrained(test=False, input_size=input_size)
         wound_images = WoundMaskedImages(root_dir, fold_iteration=fold_iteration, test=False,
                                          transform=transform, target_transform=target_transform)
         shuffle_dataset = True
@@ -1016,19 +1017,20 @@ def get_dataloaders_classification(config, batch, mode='all', fold_iteration=0):
             DatasetClass = WoundImages
         T = Pretrained
         target_transform = Compose([TargetValue()])
-
+    # get model of input size
+    input_size = eval(C.config['MODELS']['input_size'])
     if mode == "all":
-        transform = T(test=True)
+        transform = T(test=True, input_size=input_size)
         images = DatasetClass(root_dir, transform=transform, target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = T(test=True)
+        transform = T(test=True, input_size=input_size)
         images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=True,
                               transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
-        transform = T(test=False)
+        transform = T(test=False, input_size=input_size)
         images = DatasetClass(root_dir, fold_iteration=fold_iteration, test=False,
                               transform=transform, target_transform=target_transform)
         shuffle_dataset = True
@@ -1099,21 +1101,22 @@ def get_dataloaders(config, batch, mode='all', fold_iteration=0, target='single'
         return get_dataloaders_reconstruction(config, batch, mode=mode, fold_iteration=fold_iteration)
     else:
         raise ValueError(f"Invalid target {target}")
-
+    # get input size
+    input_size = eval(C.config['MODELS']['input_size'])
     # todo: from confing input_size must be generated of input from the get_model
     if mode == "all":
-        transform = Pretrained(test=True)
+        transform = Pretrained(test=True, input_size=input_size)
         wound_images = WoundImages(root_dir, crop_lesion=_crop_lesion, fuzzy_labels=fuzzy_labels, transform=transform,
                                    target_transform=target_transform)
         shuffle_dataset = False
     elif mode == 'test':
-        transform = Pretrained(test=True)
+        transform = Pretrained(test=True, input_size=input_size)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=True, crop_lesion=_crop_lesion,
                                    fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
 
         shuffle_dataset = False
     elif mode == 'train':
-        transform = Pretrained(test=False)
+        transform = Pretrained(test=False, input_size=input_size)
         wound_images = WoundImages(root_dir, fold_iteration=fold_iteration, test=False, crop_lesion=_crop_lesion,
                                    fuzzy_labels=fuzzy_labels, transform=transform, target_transform=target_transform)
         shuffle_dataset = True

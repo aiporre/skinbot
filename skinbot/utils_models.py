@@ -253,6 +253,7 @@ def get_backbone(model_name, num_outputs, freeze='No', pretrained=True, conv_onl
             backbone.fc = PlainLayer()
     else:
         raise Exception(f'model name {model_name} is not defined')
+    print('TANSFORMS:', T)
     return backbone
 
 
